@@ -11,6 +11,8 @@ const digits = (value) => value.replace(/\D/g, "").slice(0, 14);
 let tab;
 let busy = false;
 let starting = false;
+let initializing = true;
+let draftKey;
 
 document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
 async function refreshUpdater() {
@@ -57,8 +59,10 @@ function renderButton() {
   const withoutCnpj = inService || inValues;
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
-  for (const field of [input, description, amount, ...suspensionChoices]) field.disabled = withoutCnpj;
-  button.disabled = busy || starting ||
+  for (const field of [input, description, amount, ...suspensionChoices]) {
+    field.disabled = withoutCnpj || initializing || busy || starting;
+  }
+  button.disabled = initializing || busy || starting ||
     (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14 || !invoiceData()));
 }
 function show(message, error = false) {
@@ -70,19 +74,60 @@ function mask(value) {
     (value.length > 5 ? "." + value.slice(5, 8) : "") +
     (value.length > 8 ? "/" + value.slice(8, 12) : "") + (value.length > 12 ? "-" + value.slice(12) : "");
 }
-input.addEventListener("input", () => {
-  input.value = mask(digits(input.value));
-  renderButton();
-});
-description.addEventListener("input", renderButton);
-amount.addEventListener("input", () => {
+function showAmountHint() {
   const invalid = !!amount.value.trim() && !serviceAmount();
   amount.setAttribute("aria-invalid", String(invalid));
   document.querySelector("#amount-hint").textContent = invalid
     ? "Digite um valor maior que zero no formato 1.234,56."
     : "Use o formato 1.234,56.";
+}
+function setSuspension(value) {
+  for (const choice of suspensionChoices) choice.checked = choice.value === value;
+}
+function saveDraft() {
+  if (!draftKey || initializing) return;
+  const draft = {
+    cnpj: digits(input.value),
+    description: description.value,
+    amount: amount.value,
+    suspension: suspensionChoices.find((choice) => choice.checked)?.value || "no"
+  };
+  chrome.storage.session.set({ [draftKey]: draft }).catch(() => {
+    if (!busy && !starting) show("Não foi possível guardar o rascunho nesta guia.", true);
+  });
+}
+function onDraftEdit() {
   renderButton();
+  saveDraft();
+}
+input.addEventListener("input", () => {
+  input.value = mask(digits(input.value));
+  onDraftEdit();
 });
+description.addEventListener("input", onDraftEdit);
+amount.addEventListener("input", () => {
+  showAmountHint();
+  onDraftEdit();
+});
+for (const choice of suspensionChoices) choice.addEventListener("change", onDraftEdit);
+
+async function initialize() {
+  renderButton();
+  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  if (tab?.id != null) {
+    draftKey = "nfsePopupDraft:" + tab.id;
+    const saved = (await chrome.storage.session.get(draftKey))[draftKey];
+    if (saved) {
+      input.value = mask(digits(saved.cnpj || ""));
+      description.value = saved.description || "";
+      amount.value = saved.amount || "";
+      setSuspension(saved.suspension === "yes" ? "yes" : "no");
+      showAmountHint();
+    }
+  }
+  initializing = false;
+  await refresh();
+}
 async function refresh() {
   [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
   const key = "nfseFlow:" + tab?.id;
@@ -124,8 +169,6 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     if (valuesUrl.test(tab.url)) message = { type: "nfse:start-values" };
     const reply = await chrome.tabs.sendMessage(tab.id, message);
     if (!reply?.ok) throw new Error();
-    for (const field of [input, description, amount]) field.value = "";
-    suspensionChoices[0].checked = true;
     starting = false;
     await refresh();
   } catch {
@@ -134,8 +177,15 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     show("Não foi possível iniciar. Atualize a página do portal e tente novamente.", true);
   }
 });
-chrome.storage.onChanged.addListener((_, area) => {
-  if (area === "session") refresh().catch(() => {});
+chrome.storage.onChanged.addListener((changes, area) => {
+  if (area !== "session" || initializing) return;
+  if (draftKey && changes[draftKey] && !changes[draftKey].newValue) {
+    for (const field of [input, description, amount]) field.value = "";
+    setSuspension("no");
+    showAmountHint();
+    renderButton();
+  }
+  if (changes["nfseFlow:" + tab?.id]) refresh().catch(() => {});
 });
 chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id) refresh().catch(() => {}); });
-refresh().catch(() => show("Não foi possível localizar o portal.", true));
+initialize().catch(() => show("Não foi possível localizar o portal.", true));

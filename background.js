@@ -1,4 +1,5 @@
 const key = (id) => "nfseFlow:" + id;
+const draftKey = (id) => "nfsePopupDraft:" + id;
 const queues = new Map();
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
@@ -24,7 +25,10 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const state = isClaim
       ? (Date.now() < stored.until ? { ...stored, phase: isValues ? "values" : "service", until: Date.now() + 120000 } : null)
       : message.state;
-    if (state) await chrome.storage.session.set({ [storageKey]: state });
+    if (state) {
+      await chrome.storage.session.set({ [storageKey]: state });
+      if (message.type === "nfse:claim") await chrome.storage.session.remove(draftKey(id)).catch(() => {});
+    }
     return state;
   });
   queues.set(id, task);
@@ -35,5 +39,5 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 });
 chrome.tabs.onRemoved.addListener(async (id) => {
   await queues.get(id)?.catch(() => {});
-  await chrome.storage.session.remove(key(id));
+  await chrome.storage.session.remove([key(id), draftKey(id)]);
 });
