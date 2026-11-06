@@ -29,7 +29,7 @@
         <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
         <p id="hint">Também usado para o destinatário quando necessário.</p>
         <div class="label-row"><label for="description">Descrição do Serviço/Fornecimento</label><span id="count" aria-hidden="true">0/2000</span></div>
-        <textarea id="description" name="description" rows="3" maxlength="2000" placeholder="Descreva o serviço prestado" required></textarea>
+        <textarea id="description" name="description" rows="5" maxlength="2000" placeholder="Descreva o serviço prestado" required></textarea>
         <div class="invoice-details">
           <div class="money">
             <label for="amount">Valor do serviço</label>
@@ -49,7 +49,6 @@
     </form>
   </main>
   <footer class="action-dock">
-    <label class="robot-toggle"><span class="robot-mini" aria-hidden="true">◉</span><span>Modo Robozinho<small>Animações durante o preenchimento</small></span><input type="checkbox" id="robot-mode" checked role="switch"></label>
     <p id="status" role="status" aria-live="polite"></p>
     <button id="fill" disabled type="submit" form="fill-form"><span id="fill-label">Preencher</span><span class="arrow" aria-hidden="true">→</span></button>
     <div class="footer-meta">

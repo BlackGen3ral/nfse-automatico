@@ -208,21 +208,30 @@
       <style>
         :host{font:13px/1.4 system-ui,sans-serif;color:#183f32}
         *{box-sizing:border-box}
-        .card{width:min(330px,calc(100vw - 36px));border:1px solid #b2d3be;border-radius:16px;background:#f7fff9;box-shadow:0 9px 35px #123f3030;pointer-events:auto;overflow:hidden}
+        .card{width:min(352px,calc(100vw - 36px));border:1px solid #b2d3be;border-radius:16px;background:#f7fff9;box-shadow:0 9px 35px #123f3030;pointer-events:auto;overflow:hidden}
         .top{display:flex;align-items:center;gap:12px;padding:14px 14px 9px}
         .brand{font-size:10px;letter-spacing:.12em;color:#3e7357;font-weight:750}
         h2{font-size:15px;margin:2px 0;color:#173e2d}
         .controls{margin-left:auto;display:flex;align-self:flex-start;gap:3px}
         button{border:0;background:#e1f0e6;color:#25583e;border-radius:6px;padding:3px 7px;font:inherit;cursor:pointer}
         button:focus-visible{outline:2px solid #08714f}
-        .robot{position:relative;flex:none;width:46px;height:49px;animation:bob 2.4s ease-in-out infinite}
-        .antenna{position:absolute;left:22px;top:0;width:3px;height:9px;background:#257e55}
-        .antenna:before{content:"";position:absolute;left:-2px;top:-2px;width:7px;height:7px;border-radius:50%;background:#80e6ac}
-        .body{position:absolute;inset:8px 0 3px;border:2px solid #1c7352;border-radius:12px 12px 10px 10px;background:#b6f1cc;box-shadow:inset 0 -5px #8ddcaa}
-        .face{position:absolute;left:6px;right:6px;top:7px;height:19px;border-radius:7px;background:#123d30;display:flex;align-items:center;justify-content:center;gap:8px}
-        .eye{width:5px;height:7px;border-radius:3px;background:#c7ffdb;animation:blink 5s infinite}
-        .smile{position:absolute;bottom:4px;left:17px;width:9px;height:4px;border-bottom:2px solid #28704e;border-radius:50%}
-        .hand{position:absolute;right:-7px;top:26px;width:10px;height:12px;border-radius:6px;background:#83d9a2;transform:rotate(-20deg)}
+        .robot{position:relative;flex:none;width:66px;height:72px;animation:bob 2.8s ease-in-out infinite;filter:drop-shadow(0 3px 2px #0b4b2320)}
+        .antenna{position:absolute;left:32px;top:0;width:3px;height:12px;background:#367b5c}
+        .antenna:before{content:"";position:absolute;left:-3px;top:0;width:9px;height:9px;border:2px solid #418c64;border-radius:50%;background:#c6ffb3;box-shadow:0 0 6px #bcffba}
+        .body{position:absolute;inset:13px 4px 6px;border:2px solid #397c57;border-radius:18px 18px 15px 15px;background:linear-gradient(140deg,#e1ffd8,#a9e5bb 70%);box-shadow:inset 0 2px 0 #fff9,inset 0 -6px 0 #74b98e}
+        .face{position:absolute;left:5px;right:5px;top:8px;height:29px;border:2px solid #2b7754;border-radius:11px;background:linear-gradient(145deg,#214f41,#103429);display:flex;align-items:center;justify-content:center;gap:13px;box-shadow:inset 0 2px 3px #0003}
+        .eye{position:relative;width:7px;height:10px;border-radius:4px;background:#a9ffd3;box-shadow:0 0 5px #7cfbc54a;animation:blink 5.4s infinite}
+        .eye:after{content:"";position:absolute;top:1px;left:1px;width:2px;height:3px;border-radius:2px;background:#effff5}
+        .smile{position:absolute;bottom:7px;left:23px;width:9px;height:4px;border-bottom:2px solid #3a7d58;border-radius:50%}
+        .hand,.arm-left{position:absolute;top:34px;width:10px;height:19px;border:2px solid #397c57;border-radius:8px;background:#b6ebc3;transform-origin:50% 20%}
+        .hand{right:-2px;transform:rotate(-20deg)}
+        .arm-left{left:-2px;transform:rotate(18deg)}
+        .foot{position:absolute;bottom:1px;width:16px;height:9px;border:2px solid #397c57;border-radius:5px;background:#76bc91}
+        .foot.left{left:13px}.foot.right{right:13px}
+        .badge{position:absolute;left:9px;bottom:8px;width:7px;height:7px;border:1px solid #44845f;border-radius:2px;background:#edfff1}
+        .card[data-mood=review] .eye{height:5px;background:transparent;border-top:3px solid #baffd5;border-radius:6px 6px 0 0}
+        .card[data-mood=review] .hand{transform:rotate(-125deg);height:19px}
+        .card[data-mood=error] .eye{transform:rotate(-12deg)}
         .message{margin:0;padding:0 14px 12px;font-size:13px;min-height:42px}
         ol{display:grid;grid-template-columns:repeat(4,1fr);padding:10px 9px;margin:0;border-top:1px solid #d8eadd;list-style:none;background:#edf7ef}
         li{text-align:center;font-size:10px;color:#526d5c}
@@ -233,12 +242,11 @@
         .card[data-mood=error]{border-color:#c79257}
         .card[data-mood=error] h2{color:#85501f}
         .card[data-mood=error] .robot,.card[data-mood=review] .robot{animation:none}
-        .card[data-mood=review] .hand{transform:translateY(-12px) rotate(-30deg);height:17px}
+        .card[data-mood=review] .hand:after{content:"";position:absolute;width:5px;height:8px;left:-4px;bottom:2px;border-radius:3px;background:#b6ebc3;border:1px solid #397c57}
         .card[data-mood=review] .smile{height:6px;border-bottom-width:3px}
         .card[data-mood=error] .smile{transform:rotate(180deg)}
         .card[data-mini=true] .message,.card[data-mini=true] ol{display:none}
         .card[data-mini=true] .top{padding-bottom:14px}
-        .card[data-robot=false] .robot{display:none}
         .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
         .cursor{position:fixed;pointer-events:none;width:27px;height:33px;filter:drop-shadow(0 2px 2px #133a3040);transition:transform .22s ease;display:none;left:0;top:0}
         .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
@@ -252,7 +260,7 @@
       <div class="click" aria-hidden="true"></div>
       <section class="card" aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
-          <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i></div><i class="hand"></i></div>
+          <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
           <div><div class="brand">NFS-e AUTOMÁTICO</div><h2>Vamos preparar sua nota</h2></div>
           <div class="controls"><button type="button" class="min" aria-label="Recolher painel" aria-expanded="true">−</button><button type="button" class="close" aria-label="Fechar painel de progresso">×</button></div>
         </div>
@@ -265,7 +273,7 @@
     const ring = root.querySelector(".target");
     const cursor = root.querySelector("svg");
     const click = root.querySelector(".click");
-    let robot = true, dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0;
+    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
     function clearTarget() {
@@ -274,7 +282,7 @@
       clearTimeout(hideTimer);
     }
     function position() {
-      if (!target?.isConnected || !robot) return clearTarget();
+      if (!target?.isConnected) return clearTarget();
       const r = target.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0 || r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) {
         ring.style.display = cursor.style.display = "none";
@@ -295,7 +303,6 @@
     window.addEventListener("scroll", position, {passive:true,capture:true});
     window.addEventListener("resize", position, {passive:true});
     return {
-      setRobot(enabled) { robot = enabled !== false; card.dataset.robot = String(robot); if (!robot) clearTarget(); },
       show(next, text) {
         attach(); phase = next; baseText = text; message.textContent = text;
         const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
@@ -311,7 +318,7 @@
       wait(label) { if (host.isConnected && phase !== "error") message.textContent = "Aguardando o portal · " + label; },
       restore() { message.textContent = baseText; },
       point(element, clicked = false) {
-        if (!host.isConnected || !robot || dismissed || !element) return;
+        if (!host.isConnected || dismissed || !element) return;
         if (target === element && Date.now()-lastAction < 500) return;
         lastAction = Date.now();
         const chosen = element.id && document.getElementById(element.id+"_chosen");
@@ -329,10 +336,6 @@
     };
   }
   const guide = createGuide();
-  const guideSettings = chrome.storage.local.get("nfseRobotMode").then((saved) => guide.setRobot(saved.nfseRobotMode !== false)).catch(() => {});
-  chrome.storage.onChanged?.addListener((changes, area) => {
-    if (area === "local" && changes.nfseRobotMode) guide.setRobot(changes.nfseRobotMode.newValue !== false);
-  });
 
 
   function showStatus(phase, text) { guide.show(phase, text); }
@@ -662,7 +665,6 @@
       respond({ ok: true });
       let invoice = null;
       (async () => {
-        await guideSettings;
         const state = await chrome.runtime.sendMessage({ type: "nfse:status" });
         if (state?.until > Date.now() && state.retryStep === (inValues ? "values" : "service") &&
             state.invoiceDraft === draftId() && validInvoice(state.invoice)) invoice = state.invoice;
@@ -677,7 +679,6 @@
     }
     running = true;
     (async () => {
-      await guideSettings;
       const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
       if (!state) throw new Error("Início do preenchimento");
       respond({ ok: true });
@@ -692,5 +693,5 @@
     return true;
   });
   window.addEventListener("pageshow", () => resume().catch(() => {}));
-  guideSettings.then(resume).catch(() => {});
+  resume().catch(() => {});
 })();
