@@ -2,7 +2,9 @@
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão, digite o **CNPJ do tomador** e clique em **Preencher**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
-O fluxo pesquisa os CNPJs no portal, preenche Pessoas e, quando os campos e as pesquisas estiverem confirmados, aciona **Avançar**. Em **Serviço**, aplica Brasil, Pimenta Bueno/RO, tributação 140201, ISSQN Não, NBS 120012000 e operação 050101. Preencha a descrição, revise os dados e emita manualmente.
+O fluxo marca **Sim** em **Preencher as informações IBS/CBS?** quando a pergunta aparece, para liberar a data e os campos combinados. Em seguida, pesquisa os CNPJs e, quando a etapa **Pessoas** está pronta, aciona **Avançar**. Em **Serviço**, aplica Brasil, Pimenta Bueno/RO, tributação 140201, ISSQN Não, NBS 120012000 e operação 050101. Preencha a descrição, revise os dados e emita manualmente.
+
+O andamento aparece na página do portal. Se algum campo ou pesquisa não puder ser confirmado, a extensão indica o que ficou pendente e aguarda a revisão.
 
 A extensão lê as exceções da versão anterior quando o CNPJ do emitente corresponde a um perfil local. O CNPJ digitado no painel substitui os CNPJs cadastrados naquela execução. O número vai ao Emissor Nacional pela pesquisa do próprio portal. O atualizador consulta apenas os arquivos públicos do GitHub.
 
@@ -30,5 +32,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.
 
 ## Validação no portal
 
-Os painéis da etapa Pessoas foram identificados na interface do Emissor Nacional. As seleções da etapa Serviço usam os rótulos da tela fornecida. O novo fluxo e a atualização agendada ainda precisam ser validados em uso real.
+O formulário aberto no Emissor Nacional confirmou que a data começa desabilitada e que a pergunta de IBS/CBS aparece antes dela. O preenchimento, as pesquisas, o avanço e a indicação de pendências foram verificados com um formulário simulado e dados fictícios. Falta validar a execução completa da versão 0.2.1 no portal e a atualização agendada em uso real.
 

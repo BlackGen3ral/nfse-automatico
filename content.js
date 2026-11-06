@@ -105,6 +105,11 @@
   function chooseRadio(scope, optionText) {
     const radio = findRadio(scope, optionText);
     if (!radio || radio.disabled) return !!radio?.checked;
+    if (!radio.checked) {
+      const label = Array.from(radio.labels || []).find((item) =>
+        norm(item.innerText || item.textContent) === norm(optionText));
+      label?.click();
+    }
     if (!radio.checked) radio.click();
     return radio.checked;
   }
@@ -127,7 +132,28 @@
     return { ...defaults, ...nfseConfig?.defaults, ...profile?.overrides };
   }
 
+  let statusBox;
+  function showStatus(phase, text) {
+    if (!statusBox?.isConnected) {
+      statusBox = document.createElement("aside");
+      statusBox.style.cssText = "position:fixed;bottom:20px;left:20px;z-index:2147483647;width:min(360px,calc(100vw - 40px));box-sizing:border-box;padding:12px 38px 12px 14px;border-radius:8px;color:white;font:14px/1.4 system-ui,sans-serif;box-shadow:0 4px 18px #0003";
+      const message = document.createElement("div");
+      message.setAttribute("role", "status");
+      const close = document.createElement("button");
+      close.type = "button";
+      close.textContent = "×";
+      close.setAttribute("aria-label", "Fechar aviso da extensão");
+      close.style.cssText = "position:absolute;top:6px;right:8px;border:0;background:none;color:inherit;font-size:22px;cursor:pointer";
+      close.addEventListener("click", () => statusBox.remove());
+      statusBox.append(message, close);
+      document.body.append(statusBox);
+    }
+    statusBox.style.background = phase === "error" ? "#83351e" : "#134b3a";
+    statusBox.firstElementChild.textContent = text;
+  }
+
   function update(phase, text, extra = {}) {
+    showStatus(phase, text);
     return chrome.runtime.sendMessage({
       type: "nfse:update",
       state: { phase, text, until: Date.now() + (phase === "waiting" ? 25000 : 120000), ...extra }
@@ -192,25 +218,41 @@
   async function fillPeople(cnpj) {
     const settings = await preferences();
     const scope = document.querySelector("main, #main-content") || document;
-    await waitFor("Data de competência", () => {
-      const field = findControl(scope, /^data de competencia/);
-      return visible(field) && setNativeValue(field, dateValue(field)) && field.value === dateValue(field);
-    });
+    const issues = [];
+    async function tryStep(step) {
+      try { await step(); return true; }
+      catch (error) { issues.push(error.message); return false; }
+    }
+
+    // O portal habilita a competência e as informações do destinatário após esta escolha.
+    const ibs = () => panel("pnlInfoIBSCBS");
+    if (ibs()) await tryStep(() => applyRadio(ibs, "Preencher as informações IBS/CBS", "Sim"));
+    await tryStep(() => waitFor("Data de competência", () => {
+      const field = document.getElementById("DataCompetencia") || findControl(scope, /^data de competencia/);
+      return visible(field) && !field.disabled && setNativeValue(field, dateValue(field)) && field.value === dateValue(field);
+    }));
     const regime = () => findControl(scope, /regime de apuracao/);
-    if (regime()) await waitFor("Regime de apuração", () => selectOption(regime(), settings.regime, !settings.regime || settings.regime === "first-valid"));
+    if (regime()) await tryStep(() => waitFor("Regime de apuração", () => selectOption(regime(), settings.regime, !settings.regime || settings.regime === "first-valid")));
     const government = () => panel("pnlComprasGov");
-    if (government()) await applyRadio(government, "Compra governamental", settings.governmentPurchase ? "Sim" : "Não");
+    if (government()) await tryStep(() => applyRadio(government, "Compra governamental", settings.governmentPurchase ? "Sim" : "Não"));
 
     const customer = () => panel("pnlTomador");
-    await applyRadio(customer, "Localização do tomador", settings.customerLocation);
-    if (settings.customerLocation === "Brasil") await lookup(customer, "Tomador", "Tomador", cnpj);
-    const destination = () => panel("pnlDestinatario");
-    await applyRadio(destination, "Destinatário é o próprio adquirente", settings.recipientIsAcquirer ? "Sim" : "Não");
-    if (!settings.recipientIsAcquirer) {
-      await applyRadio(destination, "Localização do destinatário", settings.recipientLocation);
-      if (settings.recipientLocation === "Brasil") await lookup(destination, "Destinatario", "Destinatário", cnpj);
+    const customerReady = await tryStep(() => applyRadio(customer, "Localização do tomador", settings.customerLocation));
+    if (customerReady && settings.customerLocation === "Brasil") {
+      showStatus("people", "Pesquisando o CNPJ do tomador…");
+      await tryStep(() => lookup(customer, "Tomador", "Tomador", cnpj));
     }
-    await applyRadio(() => panel("pnlIntermediario"), "Intermediário", settings.intermediary);
+    const destination = () => panel("pnlDestinatario");
+    const destinationReady = await tryStep(() => applyRadio(destination, "Destinatário é o próprio adquirente", settings.recipientIsAcquirer ? "Sim" : "Não"));
+    if (destinationReady && !settings.recipientIsAcquirer) {
+      const locationReady = await tryStep(() => applyRadio(destination, "Localização do destinatário", settings.recipientLocation));
+      if (locationReady && settings.recipientLocation === "Brasil") {
+        showStatus("people", "Pesquisando o CNPJ do destinatário…");
+        await tryStep(() => lookup(destination, "Destinatario", "Destinatário", cnpj));
+      }
+    }
+    await tryStep(() => applyRadio(() => panel("pnlIntermediario"), "Intermediário", settings.intermediary));
+    if (issues.length) throw new Error(issues.join(" · "));
 
     const next = document.getElementById("btnAvancar");
     const form = next?.form || next?.closest("form");
@@ -233,6 +275,7 @@
   }
 
   async function fillService(settings) {
+    showStatus("service", "Preenchendo Serviço…");
     const scope = document.querySelector("main, #main-content") || document;
     const select = (label, pattern, value) => waitFor(label, () => selectOption(findControl(scope, pattern), value));
     await select("País", /^pais$/, "Brasil");
@@ -254,7 +297,7 @@
   }
 
   function report(error) {
-    return update("error", "Confira este campo no portal: " + error.message + ".");
+    return update("error", "Confira no portal: " + error.message + ".");
   }
 
   async function resume() {
