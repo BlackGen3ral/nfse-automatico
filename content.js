@@ -208,6 +208,7 @@
       <style>
         :host{font:13px/1.4 system-ui,sans-serif;color:#183f32}
         *{box-sizing:border-box}
+        .card[hidden]{display:none!important}
         .card{position:relative;isolation:isolate;width:min(368px,calc(100vw - 36px));border:1px solid #68c49b66;border-radius:20px;background:radial-gradient(ellipse at 10% 0%,#285e4a 0%,transparent 64%),linear-gradient(145deg,#132f28,#081d18);color:#e6f5ec;font:13px/1.5 "Segoe UI",system-ui,sans-serif;box-shadow:0 18px 55px #00170f59,inset 0 1px #b9f9d628;pointer-events:auto;overflow:hidden;animation:arrive .42s cubic-bezier(.2,.8,.2,1) both}
         .top{position:relative;display:flex;align-items:center;gap:14px;padding:19px 16px 12px}
         .brand{font-size:9px;letter-spacing:.15em;color:#a4dabf;font-weight:750}
@@ -248,7 +249,7 @@
         .card[data-mini=true] .message,.card[data-mini=true] ol{display:none}
         .card[data-mini=true] .top{padding-bottom:14px}
         .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
-        .cursor{position:fixed;pointer-events:none;width:27px;height:33px;filter:drop-shadow(0 2px 2px #133a3040);transition:transform .22s ease;display:none;left:0;top:0}
+        .cursor{position:fixed;pointer-events:none;width:32px;height:40px;filter:drop-shadow(0 0 3px #62ffb8) drop-shadow(0 0 9px #13c577b3) drop-shadow(0 2px 2px #001d28b3);transition:transform .22s ease;display:none;left:0;top:0}
         .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
         @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
         @keyframes work-arm{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(-42deg)}}
@@ -270,9 +271,9 @@
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
       </style>
       <div class="target" aria-hidden="true"></div>
-      <svg class="cursor" viewBox="0 0 27 33" aria-hidden="true"><path d="M3 2v25l6-7 5 10 5-3-5-9 10-1Z" fill="#fff" stroke="#08734e" stroke-width="2" stroke-linejoin="round"/></svg>
+      <svg class="cursor" xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
       <div class="click" aria-hidden="true"></div>
-      <section class="card" aria-label="Assistente de preenchimento NFS-e">
+      <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
           <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
           <div><div class="brand">NFS-e AUTOMÁTICO</div><h2>Vamos preparar sua nota</h2></div>
@@ -299,13 +300,13 @@
     function position() {
       if (!target?.isConnected) return clearTarget();
       const r = target.getBoundingClientRect();
-      if (r.width <= 0 || r.height <= 0 || r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) {
+      if (r.width <= 0 || r.height <= 0 || r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) {
         ring.style.display = cursor.style.display = "none";
         return;
       }
       Object.assign(ring.style, {display:"block",left:(r.left-3)+"px",top:(r.top-3)+"px",width:(r.width+6)+"px",height:(r.height+6)+"px"});
       cursor.style.display = "block";
-      cursor.style.transform = "translate(" + Math.min(r.right-8,innerWidth-30) + "px," + Math.max(0,r.top+r.height/2) + "px)";
+      cursor.style.transform = "translate(" + Math.max(0, Math.min(r.right-8, innerWidth-40)) + "px," + Math.max(0, Math.min(r.top+r.height/2, innerHeight-48)) + "px)";
     }
     root.querySelector(".close").onclick = () => { dismissed = true; clearInterval(dismissTimer); host.remove(); clearTarget(); };
     root.querySelector(".min").onclick = (event) => {
@@ -321,8 +322,12 @@
       show(next, text) {
         clearInterval(dismissTimer);
         phase = next; baseText = text;
-        if (next !== "review-ready") { host.remove(); clearTarget(); return; }
-        attach(); message.textContent = text;
+        if (next !== "review-ready") {
+          card.hidden = true; clearTarget();
+          if (next === "error") host.remove(); else attach();
+          return;
+        }
+        card.hidden = false; attach(); message.textContent = text;
         const countdown = root.querySelector(".dismiss-countdown");
         const closeAt = Date.now() + 7000;
         countdown.textContent = "Fechando em 7 s…";
@@ -351,7 +356,8 @@
       wait(label) { if (host.isConnected && phase !== "error") message.textContent = "Aguardando o portal · " + label; },
       restore() { message.textContent = baseText; },
       point(element, clicked = false) {
-        if (!host.isConnected || dismissed || !element) return;
+        if (dismissed || phase === "error" || phase === "review-ready" || !element) return;
+        attach();
         if (target === element && Date.now()-lastAction < 500) return;
         lastAction = Date.now();
         const chosen = element.id && document.getElementById(element.id+"_chosen");

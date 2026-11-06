@@ -1,6 +1,6 @@
 # NFS-e Automático
 
-O assistente com mascote aparece apenas quando o preenchimento chega à revisão. O aviso mostra uma contagem regressiva de 7 segundos e fecha automaticamente. Você também pode fechá-lo pelo X. A emissão continua manual no portal.
+Durante o preenchimento, uma seta ilustrativa com contorno claro e brilho verde acompanha os campos acionados. O assistente com mascote aparece apenas quando o preenchimento chega à revisão. O aviso mostra uma contagem regressiva de 7 segundos e fecha automaticamente. Você também pode fechá-lo pelo X. A emissão continua manual no portal.
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
