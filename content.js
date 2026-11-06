@@ -46,6 +46,7 @@
     if (!element || element.disabled) return false;
     const next = String(value);
     if (element.value === next) return true;
+    guide.point(element);
     const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), "value")?.set;
     if (setter) setter.call(element, next);
     else element.value = next;
@@ -71,6 +72,7 @@
     if (!option) return false;
     if (element.value === option.value) return true;
     if (element.disabled) return false;
+    guide.point(element, true);
     const chosen = document.getElementById(element.id + "_chosen");
     if (visible(chosen)) {
       const opener = chosen.querySelector(".chosen-single");
@@ -114,6 +116,7 @@
       return field() && !field().disabled && visible(widget) && widget;
     }, 12000);
     if (selected()) return;
+    guide.point(control, true);
     if (control.getAttribute("aria-expanded") !== "true") {
       pressWidgetKey(control, "Enter", 13);
     }
@@ -125,6 +128,7 @@
         return owned || document.querySelector(".select2-container--open .select2-search__field");
       });
       for (const term of terms) {
+        guide.point(search);
         search.value = term;
         search.dispatchEvent(new Event("input", { bubbles: true }));
         const result = await waitFor(label + " · resultado", () => {
@@ -134,6 +138,7 @@
               select2LabelMatches(item.textContent, wanted));
         }, 4500).catch(() => null);
         if (!result) continue;
+        guide.point(result, true);
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
         await waitFor(label + " · seleção", selected);
         return;
@@ -169,6 +174,7 @@
     const radio = findRadio(scope, optionText, group);
     if (!radio || radio.disabled) return !!radio?.checked;
     if (!radio.checked) {
+      guide.point(radio, true);
       const label = Array.from(radio.labels || []).find((item) =>
         norm(item.innerText || item.textContent) === norm(optionText));
       label?.click();
@@ -194,25 +200,142 @@
     return { ...defaults, ...nfseConfig?.defaults, ...profile?.overrides };
   }
 
-  let statusBox;
-  function showStatus(phase, text) {
-    if (!statusBox?.isConnected) {
-      statusBox = document.createElement("aside");
-      statusBox.style.cssText = "position:fixed;bottom:20px;left:20px;z-index:2147483647;width:min(360px,calc(100vw - 40px));box-sizing:border-box;padding:12px 38px 12px 14px;border-radius:8px;color:white;font:14px/1.4 system-ui,sans-serif;box-shadow:0 4px 18px #0003";
-      const message = document.createElement("div");
-      message.setAttribute("role", "status");
-      const close = document.createElement("button");
-      close.type = "button";
-      close.textContent = "×";
-      close.setAttribute("aria-label", "Fechar aviso da extensão");
-      close.style.cssText = "position:absolute;top:6px;right:8px;border:0;background:none;color:inherit;font-size:22px;cursor:pointer";
-      close.addEventListener("click", () => statusBox.remove());
-      statusBox.append(message, close);
-      document.body.append(statusBox);
+  function createGuide() {
+    const host = document.createElement("div");
+    host.style.cssText = "all:initial;position:fixed;bottom:18px;right:18px;z-index:2147483646;pointer-events:none";
+    const root = host.attachShadow({ mode: "open" });
+    root.innerHTML = `
+      <style>
+        :host{font:13px/1.4 system-ui,sans-serif;color:#183f32}
+        *{box-sizing:border-box}
+        .card{width:min(330px,calc(100vw - 36px));border:1px solid #b2d3be;border-radius:16px;background:#f7fff9;box-shadow:0 9px 35px #123f3030;pointer-events:auto;overflow:hidden}
+        .top{display:flex;align-items:center;gap:12px;padding:14px 14px 9px}
+        .brand{font-size:10px;letter-spacing:.12em;color:#3e7357;font-weight:750}
+        h2{font-size:15px;margin:2px 0;color:#173e2d}
+        .controls{margin-left:auto;display:flex;align-self:flex-start;gap:3px}
+        button{border:0;background:#e1f0e6;color:#25583e;border-radius:6px;padding:3px 7px;font:inherit;cursor:pointer}
+        button:focus-visible{outline:2px solid #08714f}
+        .robot{position:relative;flex:none;width:46px;height:49px;animation:bob 2.4s ease-in-out infinite}
+        .antenna{position:absolute;left:22px;top:0;width:3px;height:9px;background:#257e55}
+        .antenna:before{content:"";position:absolute;left:-2px;top:-2px;width:7px;height:7px;border-radius:50%;background:#80e6ac}
+        .body{position:absolute;inset:8px 0 3px;border:2px solid #1c7352;border-radius:12px 12px 10px 10px;background:#b6f1cc;box-shadow:inset 0 -5px #8ddcaa}
+        .face{position:absolute;left:6px;right:6px;top:7px;height:19px;border-radius:7px;background:#123d30;display:flex;align-items:center;justify-content:center;gap:8px}
+        .eye{width:5px;height:7px;border-radius:3px;background:#c7ffdb;animation:blink 5s infinite}
+        .smile{position:absolute;bottom:4px;left:17px;width:9px;height:4px;border-bottom:2px solid #28704e;border-radius:50%}
+        .hand{position:absolute;right:-7px;top:26px;width:10px;height:12px;border-radius:6px;background:#83d9a2;transform:rotate(-20deg)}
+        .message{margin:0;padding:0 14px 12px;font-size:13px;min-height:42px}
+        ol{display:grid;grid-template-columns:repeat(4,1fr);padding:10px 9px;margin:0;border-top:1px solid #d8eadd;list-style:none;background:#edf7ef}
+        li{text-align:center;font-size:10px;color:#526d5c}
+        li span{display:grid;place-items:center;margin:0 auto 4px;width:22px;height:22px;border-radius:7px;background:#dcece0;font-weight:750}
+        li[data-state=active]{color:#075d3d;font-weight:750}
+        li[data-state=active] span{background:#08734e;color:white;box-shadow:0 0 0 3px #c1e7ce;animation:pulse 1.8s infinite}
+        li[data-state=done] span{background:#bfe6cc;color:#165238}
+        .card[data-mood=error]{border-color:#c79257}
+        .card[data-mood=error] h2{color:#85501f}
+        .card[data-mood=error] .robot,.card[data-mood=review] .robot{animation:none}
+        .card[data-mood=review] .hand{transform:translateY(-12px) rotate(-30deg);height:17px}
+        .card[data-mood=review] .smile{height:6px;border-bottom-width:3px}
+        .card[data-mood=error] .smile{transform:rotate(180deg)}
+        .card[data-mini=true] .message,.card[data-mini=true] ol{display:none}
+        .card[data-mini=true] .top{padding-bottom:14px}
+        .card[data-robot=false] .robot{display:none}
+        .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
+        .cursor{position:fixed;pointer-events:none;width:27px;height:33px;filter:drop-shadow(0 2px 2px #133a3040);transition:transform .22s ease;display:none;left:0;top:0}
+        .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
+        @keyframes bob{50%{transform:translateY(-3px)}}
+        @keyframes blink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.1)}}
+        @keyframes pulse{50%{box-shadow:0 0 0 5px #c1e7ce50}}
+        @media(prefers-reduced-motion:reduce){*,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
+      </style>
+      <div class="target" aria-hidden="true"></div>
+      <svg class="cursor" viewBox="0 0 27 33" aria-hidden="true"><path d="M3 2v25l6-7 5 10 5-3-5-9 10-1Z" fill="#fff" stroke="#08734e" stroke-width="2" stroke-linejoin="round"/></svg>
+      <div class="click" aria-hidden="true"></div>
+      <section class="card" aria-label="Assistente de preenchimento NFS-e">
+        <div class="top">
+          <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i></div><i class="hand"></i></div>
+          <div><div class="brand">NFS-e AUTOMÁTICO</div><h2>Vamos preparar sua nota</h2></div>
+          <div class="controls"><button type="button" class="min" aria-label="Recolher painel" aria-expanded="true">−</button><button type="button" class="close" aria-label="Fechar painel de progresso">×</button></div>
+        </div>
+        <p class="message" role="status" aria-live="polite"></p>
+        <ol aria-label="Progresso"><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol>
+      </section>`;
+    const card = root.querySelector(".card");
+    const message = root.querySelector(".message");
+    const title = root.querySelector("h2");
+    const ring = root.querySelector(".target");
+    const cursor = root.querySelector("svg");
+    const click = root.querySelector(".click");
+    let robot = true, dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0;
+    const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
+    function clearTarget() {
+      target = null;
+      ring.style.display = cursor.style.display = click.style.display = "none";
+      clearTimeout(hideTimer);
     }
-    statusBox.style.background = phase === "error" ? "#83351e" : "#134b3a";
-    statusBox.firstElementChild.textContent = text;
+    function position() {
+      if (!target?.isConnected || !robot) return clearTarget();
+      const r = target.getBoundingClientRect();
+      if (r.width <= 0 || r.height <= 0 || r.top < 0 || r.bottom > innerHeight || r.left < 0 || r.right > innerWidth) {
+        ring.style.display = cursor.style.display = "none";
+        return;
+      }
+      Object.assign(ring.style, {display:"block",left:(r.left-3)+"px",top:(r.top-3)+"px",width:(r.width+6)+"px",height:(r.height+6)+"px"});
+      cursor.style.display = "block";
+      cursor.style.transform = "translate(" + Math.min(r.right-8,innerWidth-30) + "px," + Math.max(0,r.top+r.height/2) + "px)";
+    }
+    root.querySelector(".close").onclick = () => { dismissed = true; host.remove(); clearTarget(); };
+    root.querySelector(".min").onclick = (event) => {
+      const mini = card.dataset.mini !== "true";
+      card.dataset.mini = String(mini);
+      event.currentTarget.textContent = mini ? "+" : "−";
+      event.currentTarget.setAttribute("aria-expanded", String(!mini));
+      event.currentTarget.setAttribute("aria-label", mini ? "Expandir painel" : "Recolher painel");
+    };
+    window.addEventListener("scroll", position, {passive:true,capture:true});
+    window.addEventListener("resize", position, {passive:true});
+    return {
+      setRobot(enabled) { robot = enabled !== false; card.dataset.robot = String(robot); if (!robot) clearTarget(); },
+      show(next, text) {
+        attach(); phase = next; baseText = text; message.textContent = text;
+        const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
+        card.dataset.mood = next === "error" ? "error" : next === "review-ready" ? "review" : "working";
+        title.textContent = next === "error" ? "Preciso da sua ajuda" : next === "review-ready" ? "Agora é com você!" : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
+        root.querySelectorAll("li").forEach((item,i) => {
+          item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
+          item.querySelector("span").textContent = i < index ? "✓" : String(i+1);
+          if (i === index) item.setAttribute("aria-current","step"); else item.removeAttribute("aria-current");
+        });
+        if (next === "error" || next === "review-ready" || next === "review") clearTarget();
+      },
+      wait(label) { if (host.isConnected && phase !== "error") message.textContent = "Aguardando o portal · " + label; },
+      restore() { message.textContent = baseText; },
+      point(element, clicked = false) {
+        if (!host.isConnected || !robot || dismissed || !element) return;
+        if (target === element && Date.now()-lastAction < 500) return;
+        lastAction = Date.now();
+        const chosen = element.id && document.getElementById(element.id+"_chosen");
+        const select2 = element.id && document.getElementById("select2-"+element.id+"-container");
+        target = visible(chosen) ? chosen : visible(select2) ? select2.closest(".select2-selection") : element;
+        if (!visible(target)) target = Array.from(element.labels || []).find(visible);
+        position();
+        if (clicked && cursor.style.display === "block" && !reduced()) {
+          const r = target.getBoundingClientRect();
+          Object.assign(click.style,{display:"block",transform:"translate("+(r.right-20)+"px,"+(r.top+r.height/2-12)+"px)"});
+          click.animate?.([{opacity:1,scale:".5"},{opacity:0,scale:"1.8"}],{duration:450});
+        }
+        clearTimeout(hideTimer); hideTimer = setTimeout(clearTarget, 1000);
+      }
+    };
   }
+  const guide = createGuide();
+  const guideSettings = chrome.storage.local.get("nfseRobotMode").then((saved) => guide.setRobot(saved.nfseRobotMode !== false)).catch(() => {});
+  chrome.storage.onChanged?.addListener((changes, area) => {
+    if (area === "local" && changes.nfseRobotMode) guide.setRobot(changes.nfseRobotMode.newValue !== false);
+  });
+
+
+  function showStatus(phase, text) { guide.show(phase, text); }
 
   const draftId = () => new URLSearchParams(location.search).get("idr");
 
@@ -221,7 +344,7 @@
     return chrome.runtime.sendMessage({
       type: "nfse:update",
       state: {
-        phase, text, valuesDraft, invoice, invoiceDraft, retryStep,
+        phase, text, valuesDraft, invoice, invoiceDraft, retryStep, visualDraft: draftId(),
         until: Date.now() + (valuesDraft || retryStep ? 1800000 : 120000)
       }
     });
@@ -248,6 +371,7 @@
   }
 
   function watchAdvance(path, button, stageName, invoice = null) {
+    guide.point(button, true);
     button.click();
     setTimeout(() => {
       if (path.test(location.pathname)) {
@@ -258,11 +382,15 @@
 
   async function waitFor(label, predicate, timeout = 7500) {
     const deadline = Date.now() + timeout;
+    const startedAt = Date.now();
+    let waitingShown = false;
     do {
       const result = predicate();
-      if (result) return result;
+      if (result) { if (waitingShown) guide.restore(); return result; }
+      if (!waitingShown && Date.now() - startedAt > 1300) { guide.wait(label); waitingShown = true; }
       await new Promise((resolve) => setTimeout(resolve, 140));
     } while (Date.now() < deadline);
+    if (waitingShown) guide.restore();
     throw new Error(label);
   }
 
@@ -302,6 +430,7 @@
       return visible(candidate) && !candidate.disabled && candidate;
     });
     let nameWasCleared = !previousName || !lookupName(scope(), stem);
+    guide.point(button, true);
     button.click();
     await waitFor(label + " · resultado da pesquisa", () => {
       const name = lookupName(scope(), stem);
@@ -361,6 +490,7 @@
       invoice, invoiceDraft: draftId()
     });
     if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
+    guide.point(next, true);
     next.click();
     setTimeout(() => {
       if (peoplePath.test(location.pathname)) {
@@ -499,6 +629,14 @@
 
   async function resume() {
     const inValues = valuesPath.test(location.pathname);
+    if (!inValues && !servicePath.test(location.pathname) && !peoplePath.test(location.pathname)) {
+      const state = await chrome.runtime.sendMessage({type:"nfse:status"});
+      if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
+          state.visualDraft === draftId() && !document.querySelector("input[type=password]")) {
+        guide.show("review-ready", "Nota pronta para conferir. Revise os dados e confirme a emissão no portal.");
+      }
+      return;
+    }
     if (running || (!inValues && !servicePath.test(location.pathname))) return;
     running = true;
     let invoice = null;
@@ -524,6 +662,7 @@
       respond({ ok: true });
       let invoice = null;
       (async () => {
+        await guideSettings;
         const state = await chrome.runtime.sendMessage({ type: "nfse:status" });
         if (state?.until > Date.now() && state.retryStep === (inValues ? "values" : "service") &&
             state.invoiceDraft === draftId() && validInvoice(state.invoice)) invoice = state.invoice;
@@ -538,6 +677,7 @@
     }
     running = true;
     (async () => {
+      await guideSettings;
       const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
       if (!state) throw new Error("Início do preenchimento");
       respond({ ok: true });
@@ -552,5 +692,5 @@
     return true;
   });
   window.addEventListener("pageshow", () => resume().catch(() => {}));
-  resume().catch(() => {});
+  guideSettings.then(resume).catch(() => {});
 })();

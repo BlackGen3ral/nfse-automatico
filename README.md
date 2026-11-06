@@ -1,4 +1,6 @@
-﻿# NFS-e Automático
+# NFS-e Automático
+
+O painel de progresso acompanha Pessoas, Serviço, Valores e Revisão. O Modo Robozinho acrescenta um mascote verde animado, cursor ilustrativo e destaque nos campos acionados. Use a chave no painel para desligar as animações, ou os botões do cartão para recolher e fechar. A animação respeita o movimento reduzido do Windows.
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
@@ -43,4 +45,3 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.
 ## Validação no portal
 
 Os controles foram identificados no Emissor Nacional. A busca, a seleção, o preenchimento da descrição e do valor e a transição até a revisão foram verificados com formulários simulados.
-

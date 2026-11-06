@@ -13,6 +13,19 @@ let busy = false;
 let starting = false;
 let initializing = true;
 let draftKey;
+const robotMode = document.getElementById("robot-mode");
+robotMode.disabled = true;
+chrome.storage.local.get("nfseRobotMode").then((saved) => {
+  robotMode.checked = saved.nfseRobotMode !== false;
+  robotMode.disabled = false;
+}).catch(() => { robotMode.disabled = false; });
+robotMode.addEventListener("change", async () => {
+  const value = robotMode.checked;
+  robotMode.disabled = true;
+  try { await chrome.storage.local.set({ nfseRobotMode: value }); }
+  catch { robotMode.checked = !value; show("Não foi possível salvar o Modo Robozinho.", true); }
+  finally { robotMode.disabled = false; }
+});
 
 document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
 async function refreshUpdater() {
@@ -59,6 +72,7 @@ function renderButton() {
   const withoutCnpj = inService || inValues;
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
+  if (busy || starting) document.querySelector("#fill-label").textContent = "Preenchendo nota…";
   for (const field of [input, description, amount, ...suspensionChoices]) {
     field.disabled = withoutCnpj || initializing || busy || starting;
   }
@@ -178,6 +192,7 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
   }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes.nfseRobotMode) robotMode.checked = changes.nfseRobotMode.newValue !== false;
   if (area !== "session" || initializing) return;
   if (draftKey && changes[draftKey] && !changes[draftKey].newValue) {
     for (const field of [input, description, amount]) field.value = "";
