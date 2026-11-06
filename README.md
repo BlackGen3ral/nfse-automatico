@@ -2,6 +2,8 @@
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
+O atalho **Abrir Emissor Nacional** leva à etapa **Pessoas** em uma nova guia.
+
 O fluxo pesquisa os CNPJs em **Pessoas**, aplica a configuração tributária e a descrição em **Serviço**, informa o valor e os códigos combinados em **Valores** e avança para a **Revisão**. Você confere os dados e confirma a emissão no portal.
 
 No painel inicial, **Exigibilidade do ISSQN suspensa?** começa em **Não** para cada nota. Se marcar **Sim**, a extensão leva a escolha para **Valores** e indica quando o portal exigir dados adicionais para continuar. Essa opção é separada da retenção do ISSQN.
