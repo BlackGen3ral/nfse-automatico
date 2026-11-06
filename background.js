@@ -8,7 +8,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const storageKey = key(id);
     const stored = (await chrome.storage.session.get(storageKey))[storageKey];
     if (message.type === "nfse:status") return stored;
-    if (message.type === "nfse:claim" && stored?.phase !== "waiting") return null;
+    if (message.type === "nfse:claim") {
+      const url = new URL(sender.url);
+      if (stored?.phase !== "waiting" || !/\/DPS\/Servi(?:c|ç|%c3%a7)o(?:\/|$)/i.test(url.pathname) ||
+          (stored.invoiceDraft && url.searchParams.get("idr") !== stored.invoiceDraft)) return null;
+    }
     const isValues = message.type === "nfse:claim-values";
     if (isValues) {
       const url = new URL(sender.url);

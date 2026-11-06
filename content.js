@@ -214,12 +214,45 @@
     statusBox.firstElementChild.textContent = text;
   }
 
-  function update(phase, text, valuesDraft = null) {
+  const draftId = () => new URLSearchParams(location.search).get("idr");
+
+  function update(phase, text, { valuesDraft = null, invoice = null, invoiceDraft = null, retryStep = null } = {}) {
     showStatus(phase, text);
     return chrome.runtime.sendMessage({
       type: "nfse:update",
-      state: { phase, text, valuesDraft, until: Date.now() + (valuesDraft ? 1800000 : 120000) }
+      state: {
+        phase, text, valuesDraft, invoice, invoiceDraft, retryStep,
+        until: Date.now() + (valuesDraft || retryStep ? 1800000 : 120000)
+      }
     });
+  }
+
+  function validInvoice(invoice) {
+    return typeof invoice?.description === "string" && !!invoice.description.trim() &&
+      invoice.description.length <= 2000 && typeof invoice.amount === "string" &&
+      /^\d{1,20},\d{2}$/.test(invoice.amount) && /[1-9]/.test(invoice.amount);
+  }
+
+  function advanceButton(fieldId, stagePath, stageName) {
+    const field = document.getElementById(fieldId);
+    const form = field?.form || field?.closest("form");
+    if (!stagePath.test(location.pathname) || !form) throw new Error("Formulário da etapa " + stageName);
+    const buttons = Array.from(form.querySelectorAll("button,input[type=submit]")).filter((element) =>
+      visible(element) && !element.disabled && norm(element.textContent || element.value) === "avancar");
+    if (buttons.length !== 1) throw new Error("Botão Avançar da etapa " + stageName);
+    if (!form.checkValidity() || form.querySelector("input.input-validation-error, select.input-validation-error, textarea.input-validation-error")) {
+      throw new Error("Campos obrigatórios da etapa " + stageName);
+    }
+    return buttons[0];
+  }
+
+  function watchAdvance(path, button, stageName, invoice = null) {
+    button.click();
+    setTimeout(() => {
+      if (path.test(location.pathname)) {
+        report(new Error("O portal permaneceu em " + stageName + ". Verifique os avisos da página"), invoice).catch(() => {});
+      }
+    }, 25000);
   }
 
   async function waitFor(label, predicate, timeout = 7500) {
@@ -277,7 +310,7 @@
     }, 12000);
   }
 
-  async function fillPeople(cnpj) {
+  async function fillPeople(cnpj, invoice) {
     const settings = await preferences();
     const scope = document.querySelector("main, #main-content") || document;
     const issues = [];
@@ -323,7 +356,9 @@
       throw new Error("Campos obrigatórios da etapa Pessoas");
     }
 
-    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…");
+    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…", {
+      invoice, invoiceDraft: draftId()
+    });
     if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
     next.click();
     setTimeout(() => {
@@ -333,7 +368,7 @@
     }, 120000);
   }
 
-  async function fillService() {
+  async function fillService(invoice = null) {
     await update("service", "Preenchendo Serviço…");
     const scope = document.querySelector("main, #main-content") || document;
     const select = (label, id, value) => waitFor(label, () => selectOption(document.getElementById(id), value), 12000);
@@ -364,8 +399,21 @@
     await attempt(() => select("Item da NBS", "ServicoPrestado_CodigoNBS", "120012000"));
     await attempt(() => select("Código indicador da operação", "ServicoPrestado_CodigoIndOp", "050101"));
     if (issues.length) throw new Error(issues.join(" · "));
-    const draft = new URLSearchParams(location.search).get("idr");
-    await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.", draft);
+    const draft = draftId();
+    if (!invoice) {
+      await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.", { valuesDraft: draft });
+      return;
+    }
+    await waitFor("Descrição do Serviço/Fornecimento", () => {
+      const field = document.getElementById("ServicoPrestado_Descricao");
+      return visible(field) && !field.disabled && !field.readOnly &&
+        setNativeValue(field, invoice.description) && field.value === invoice.description;
+    });
+    if (!draft) throw new Error("Rascunho da etapa Serviço");
+    const next = advanceButton("ServicoPrestado_Descricao", servicePath, "Serviço");
+    const armed = await update("done", "Serviço preenchido. Abrindo Valores…", { valuesDraft: draft, invoice });
+    if (!armed || !servicePath.test(location.pathname)) throw new Error("Transição para Valores");
+    watchAdvance(servicePath, next, "Serviço", invoice);
   }
 
   function issqnRetentionNo() {
@@ -383,7 +431,7 @@
     return chooseRadio(scope, "Não", first.name);
   }
 
-  async function fillValues() {
+  async function fillValues(invoice = null) {
     await update("values", "Preenchendo Valores…");
     const issues = [];
     async function attempt(step) {
@@ -392,6 +440,12 @@
     }
     const select = (label, id, code) => waitFor(label,
       () => selectOption(document.getElementById(id), code), 12000);
+    if (invoice) await attempt(() => waitFor("Valor do serviço", () => {
+      const field = document.getElementById("Valores_ValorServico");
+      if (!visible(field) || field.disabled || field.readOnly) return false;
+      const formatted = invoice.amount.replace(/\B(?=(\d{3})+,)/g, ".");
+      return setNativeValue(field, formatted) && field.value.replace(/\./g, "").trim() === invoice.amount;
+    }));
     await attempt(() => waitFor("Retenção do ISSQN", issqnRetentionNo));
     const pisReady = await attempt(() => select("Situação Tributária do PIS/COFINS",
       "TributacaoFederal_PISCofins_SituacaoTributaria", "00"));
@@ -411,22 +465,34 @@
     }));
 
     if (issues.length) throw new Error(issues.join(" · "));
-    await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
+    if (!invoice) {
+      await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
+      return;
+    }
+    const next = advanceButton("Valores_ValorServico", valuesPath, "Valores");
+    const armed = await update("review", "Preenchimento concluído. Revise a nota e decida quando emitir.");
+    if (!armed || !valuesPath.test(location.pathname)) throw new Error("Transição para revisão");
+    watchAdvance(valuesPath, next, "Valores", invoice);
   }
 
-  function report(error) {
-    return update("error", "Confira no portal: " + error.message + ".");
+  function report(error, invoice = null) {
+    const draft = invoice && draftId();
+    return update("error", "Confira no portal: " + error.message + ".", draft ? {
+      invoice, invoiceDraft: draft, retryStep: valuesPath.test(location.pathname) ? "values" : "service"
+    } : {});
   }
 
   async function resume() {
     const inValues = valuesPath.test(location.pathname);
     if (running || (!inValues && !servicePath.test(location.pathname))) return;
     running = true;
+    let invoice = null;
     try {
       const flow = await chrome.runtime.sendMessage({ type: inValues ? "nfse:claim-values" : "nfse:claim" });
-      if (flow) await (inValues ? fillValues() : fillService());
+      invoice = validInvoice(flow?.invoice) ? flow.invoice : null;
+      if (flow) await (inValues ? fillValues(invoice) : fillService(invoice));
     } catch (error) {
-      await report(error);
+      await report(error, invoice);
     } finally {
       running = false;
     }
@@ -441,11 +507,17 @@
       }
       running = true;
       respond({ ok: true });
-      (inValues ? fillValues() : fillService()).catch(report).finally(() => { running = false; }).catch(() => {});
+      let invoice = null;
+      (async () => {
+        const state = await chrome.runtime.sendMessage({ type: "nfse:status" });
+        if (state?.until > Date.now() && state.retryStep === (inValues ? "values" : "service") &&
+            state.invoiceDraft === draftId() && validInvoice(state.invoice)) invoice = state.invoice;
+        await (inValues ? fillValues(invoice) : fillService(invoice));
+      })().catch((error) => report(error, invoice)).finally(() => { running = false; }).catch(() => {});
       return;
     }
     if (message.type !== "nfse:start") return;
-    if (running || !peoplePath.test(location.pathname) || !/^\d{14}$/.test(message.cnpj)) {
+    if (running || !peoplePath.test(location.pathname) || !/^\d{14}$/.test(message.cnpj) || !validInvoice(message.invoice)) {
       respond({ ok: false });
       return;
     }
@@ -454,7 +526,7 @@
       const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
       if (!state) throw new Error("Início do preenchimento");
       respond({ ok: true });
-      await fillPeople(message.cnpj);
+      await fillPeople(message.cnpj, message.invoice);
     })().catch(async (error) => {
       respond({ ok: false });
       await report(error);
