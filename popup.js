@@ -168,7 +168,12 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     if (serviceUrl.test(tab.url)) message = { type: "nfse:start-service" };
     if (valuesUrl.test(tab.url)) message = { type: "nfse:start-values" };
     const reply = await chrome.tabs.sendMessage(tab.id, message);
-    if (!reply?.ok) throw new Error();
+    if (!reply?.ok) {
+      starting = false;
+      renderButton();
+      show(reply?.error || "Não foi possível iniciar. Atualize a página do portal e tente novamente.", true);
+      return;
+    }
     if (message.type === "nfse:start") {
       window.close();
       return;

@@ -453,6 +453,30 @@
     }, 12000);
   }
 
+  async function prepareIssuer() {
+    const scope = document.querySelector("main, #main-content") || document;
+    const ibs = () => panel("pnlInfoIBSCBS");
+    if (ibs()) await applyRadio(ibs, "Preencher as informações IBS/CBS", "Sim");
+    const date = await waitFor("Data de competência", () => {
+      const field = document.getElementById("DataCompetencia") || findControl(scope, /^data de competencia/);
+      return visible(field) && !field.disabled && field;
+    });
+    const changed = date.value !== dateValue(date);
+    if (!setNativeValue(date, dateValue(date))) throw new Error("Data de competência");
+    const ready = () => {
+      const inscription = document.getElementById("Prestador_Inscricao");
+      const name = document.getElementById("Prestador_Nome");
+      const current = DIGITS(inscription?.value);
+      const logged = cnpjInEmitterHeader();
+      return current.length === 14 && !!name?.value.trim() && (!logged || current === logged);
+    };
+    if (!changed && !ready()) {
+      // Refaz a consulta do próprio portal quando a data já está preenchida.
+      date.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    await waitFor("O portal não carregou os dados do emitente. Confira o cadastro ou tente novamente em instantes", ready, 15000);
+  }
+
   async function fillPeople(cnpj, invoice) {
     const settings = await preferences();
     const scope = document.querySelector("main, #main-content") || document;
@@ -461,14 +485,6 @@
       try { await step(); return true; }
       catch (error) { issues.push(error.message); return false; }
     }
-
-    // O portal habilita a competência e as informações do destinatário após esta escolha.
-    const ibs = () => panel("pnlInfoIBSCBS");
-    if (ibs()) await tryStep(() => applyRadio(ibs, "Preencher as informações IBS/CBS", "Sim"));
-    await tryStep(() => waitFor("Data de competência", () => {
-      const field = document.getElementById("DataCompetencia") || findControl(scope, /^data de competencia/);
-      return visible(field) && !field.disabled && setNativeValue(field, dateValue(field)) && field.value === dateValue(field);
-    }));
     const regime = () => findControl(scope, /regime de apuracao/);
     if (regime()) await tryStep(() => waitFor("Regime de apuração", () => selectOption(regime(), settings.regime, !settings.regime || settings.regime === "first-valid")));
     const government = () => panel("pnlComprasGov");
@@ -688,13 +704,19 @@
       return;
     }
     running = true;
+    let replied = false;
     (async () => {
       const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
       if (!state) throw new Error("Início do preenchimento");
+      showStatus("people", "Conferindo os dados do emitente…");
+      await prepareIssuer();
       respond({ ok: true });
+      replied = true;
+      // Permite que o Chrome conclua o fechamento do painel antes das pesquisas.
+      await new Promise((resolve) => setTimeout(resolve, 0));
       await fillPeople(message.cnpj, message.invoice);
     })().catch(async (error) => {
-      respond({ ok: false });
+      if (!replied) respond({ ok: false, error: error.message });
       await report(error);
     }).finally(() => {
       running = false;
