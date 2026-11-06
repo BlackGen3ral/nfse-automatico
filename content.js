@@ -248,6 +248,8 @@
         .card[data-mood=error] .smile{transform:rotate(180deg)}
         .card[data-mini=true] .message,.card[data-mini=true] ol{display:none}
         .card[data-mini=true] .top{padding-bottom:14px}
+        .shade{position:fixed;inset:0;width:100vw;height:100vh;pointer-events:none;opacity:0;transition:opacity .2s ease}
+        .shade[data-active=true]{opacity:1}
         .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
         .cursor{position:fixed;pointer-events:none;width:32px;height:40px;filter:drop-shadow(0 0 3px #62ffb8) drop-shadow(0 0 9px #13c577b3) drop-shadow(0 2px 2px #001d28b3);transition:transform .22s ease;display:none;left:0;top:0}
         .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
@@ -270,8 +272,9 @@
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
       </style>
+      <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
       <div class="target" aria-hidden="true"></div>
-      <svg class="cursor" xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
+      <svg class="cursor" data-cursor xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
       <div class="click" aria-hidden="true"></div>
       <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
@@ -287,13 +290,24 @@
     const message = root.querySelector(".message");
     const title = root.querySelector("h2");
     const ring = root.querySelector(".target");
-    const cursor = root.querySelector("svg");
+    const cursor = root.querySelector("svg[data-cursor]");
+    const shade = root.querySelector("svg[data-shade]");
+    const shadePath = shade.querySelector("path");
+    function spotlight(rect) {
+      let outline = "M0 0H" + innerWidth + "V" + innerHeight + "H0Z";
+      if (rect) {
+        const left = Math.max(0, rect.left - 6), top = Math.max(0, rect.top - 6);
+        const right = Math.min(innerWidth, rect.right + 6), bottom = Math.min(innerHeight, rect.bottom + 6);
+        outline += " M" + left + " " + top + "H" + right + "V" + bottom + "H" + left + "Z";
+      }
+      shadePath.setAttribute("d", outline);
+    }
     const click = root.querySelector(".click");
     let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0, lastStage = null, dismissTimer;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
     function clearTarget() {
-      target = null;
+      target = null; spotlight();
       ring.style.display = cursor.style.display = click.style.display = "none";
       clearTimeout(hideTimer);
     }
@@ -302,8 +316,9 @@
       const r = target.getBoundingClientRect();
       if (r.width <= 0 || r.height <= 0 || r.bottom <= 0 || r.top >= innerHeight || r.right <= 0 || r.left >= innerWidth) {
         ring.style.display = cursor.style.display = "none";
-        return;
+        spotlight(); return;
       }
+      spotlight(r);
       Object.assign(ring.style, {display:"block",left:(r.left-3)+"px",top:(r.top-3)+"px",width:(r.width+6)+"px",height:(r.height+6)+"px"});
       cursor.style.display = "block";
       cursor.style.transform = "translate(" + Math.max(0, Math.min(r.right-8, innerWidth-40)) + "px," + Math.max(0, Math.min(r.top+r.height/2, innerHeight-48)) + "px)";
@@ -322,6 +337,7 @@
       show(next, text) {
         clearInterval(dismissTimer);
         phase = next; baseText = text;
+        shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
         if (next !== "review-ready") {
           card.hidden = true; clearTarget();
           if (next === "error") host.remove(); else attach();
