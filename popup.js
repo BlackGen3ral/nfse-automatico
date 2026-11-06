@@ -12,6 +12,27 @@ let busy = false;
 let starting = false;
 
 document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
+async function refreshUpdater() {
+  const indicator = document.querySelector("#update-dot");
+  const message = document.querySelector("#update-status");
+  try {
+    const response = await fetch(chrome.runtime.getURL("atualizador/status.json"), { cache: "no-store" });
+    if (!response.ok) throw new Error();
+    const update = await response.json();
+    const lastRun = Date.parse(update.updatedAt);
+    const stale = !Number.isFinite(lastRun) || Date.now() - lastRun > 2 * 60 * 60 * 1000;
+    const waiting = update.state === "waiting-close" && /^\d+\.\d+\.\d+$/.test(update.version);
+    const failed = update.state === "error";
+    indicator.dataset.state = waiting || failed || stale ? "attention" : "on";
+    if (failed) message.textContent = "Falha ao verificar atualizações";
+    else if (waiting) message.textContent = "v" + update.version + " pronta · feche o navegador";
+    else if (stale) message.textContent = "Atualizador sem verificação recente";
+    else message.textContent = "Atualização automática ativa";
+  } catch {
+    message.textContent = "Atualização automática sem status";
+  }
+}
+refreshUpdater();
 function serviceAmount() {
   const value = amount.value.trim();
   if (!/^(?:\d+|\d{1,3}(?:\.\d{3})+)(?:,\d{1,2})?$/.test(value)) return null;

@@ -7,9 +7,9 @@
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
-  <header>
+  <header class="hero">
     <img src="icons/icon-48.png" alt="" width="46" height="46">
-    <div><p class="eyebrow">EMISSOR NACIONAL</p><h1>NFS-e Automático</h1><p class="subtitle">Preenchimento de notas</p></div>
+    <div><p class="eyebrow">EMISSOR NACIONAL</p><h1>NFS-e Automático</h1><p class="subtitle">Da entrada dos dados à revisão</p></div>
     <span id="version" class="version"></span>
   </header>
   <main>
@@ -18,7 +18,7 @@
     </ol>
     <form id="fill-form">
       <div id="people-fields">
-        <p class="form-heading">Dados da nota</p>
+        <div class="form-intro"><div><p class="section-tag">NOVA NFS-E</p><h2>Dados da nota</h2></div><span class="field-total">3 campos</span></div>
         <label for="cnpj">CNPJ do tomador</label>
         <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
         <p id="hint">O mesmo CNPJ será usado para o destinatário quando o portal pedir esse campo.</p>
@@ -28,10 +28,13 @@
         <div class="amount-field"><span aria-hidden="true">R$</span><input id="amount" name="amount" inputmode="decimal" maxlength="20" placeholder="0,00" autocomplete="off" required aria-describedby="amount-hint"></div>
         <p id="amount-hint">Use o formato 1.234,56.</p>
       </div>
-      <button id="fill" disabled type="submit"><span id="fill-label">Preencher</span> <span aria-hidden="true">→</span></button>
+      <button id="fill" disabled type="submit"><span id="fill-label">Preencher</span><span class="arrow" aria-hidden="true">→</span></button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
-    <footer><span>Você confirma a emissão no portal</span><a href="https://github.com/BlackGen3ral/nfse-automatico#atualiza%C3%A7%C3%B5es-pelo-github" target="_blank" rel="noreferrer">Atualizações ↗</a></footer>
+    <footer>
+      <div class="update-state"><span id="update-dot" aria-hidden="true"></span><span id="update-status">Verificando atualizador…</span></div>
+      <a href="https://github.com/BlackGen3ral/nfse-automatico#atualiza%C3%A7%C3%B5es-pelo-github" target="_blank" rel="noreferrer">Atualizações ↗</a>
+    </footer>
   </main>
   <script src="popup.js"></script>
 </body>

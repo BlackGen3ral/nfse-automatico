@@ -24,7 +24,7 @@ A atualização é opcional e funciona no Windows. No PowerShell, aberto na past
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\ativar.ps1
 ```
 
-O Agendador do Windows verifica a versão publicada na branch `main` uma vez por hora, na sua conta. Quando encontra uma versão maior, baixa e confere os arquivos do mesmo commit. Ele aplica a atualização na mesma pasta quando Chrome e Edge estão fechados, incluindo processos em segundo plano. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
+O Agendador do Windows consulta a branch `main` do GitHub na sua conta. A primeira verificação começa na ativação e, depois, ocorre a cada hora. Uma versão nova é baixada e verificada mesmo com o navegador aberto. O painel mostra quando ela está pronta. Feche Chrome e Edge por completo, incluindo processos em segundo plano, para que a instalação ocorra na mesma pasta em até dois minutos. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
 
 Para desativar:
 
@@ -34,5 +34,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.
 
 ## Validação no portal
 
-Os controles foram identificados no Emissor Nacional. A busca, a seleção, o preenchimento da descrição e do valor e a transição até a revisão foram verificados com formulários simulados. A execução completa da versão 0.2.4 no portal real e a atualização agendada ainda precisam de validação.
+Os controles foram identificados no Emissor Nacional. A busca, a seleção, o preenchimento da descrição e do valor e a transição até a revisão foram verificados com formulários simulados.
 
