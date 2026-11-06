@@ -28,7 +28,9 @@ A extensão lê as exceções da etapa Pessoas quando o CNPJ do emitente corresp
 
 ## Atualizações pelo GitHub
 
-A atualização é opcional e funciona no Windows. No PowerShell, aberto na pasta da extensão, execute uma vez:
+A atualização é opcional e funciona no Windows. Ela deve ser ativada uma vez em cada PC. Extraia o ZIP completo na pasta fixa usada pelo navegador e dê dois cliques em **ATIVAR-ATUALIZACOES.cmd**, ao lado de manifest.json. Aguarde a confirmação de ativação. Copiar a extensão de outro PC não cria a tarefa de atualização. A janela aparece apenas durante essa ativação manual; as verificações seguintes são silenciosas.
+
+Como alternativa, no PowerShell aberto na pasta da extensão, execute:
 
 ```powershell
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\ativar.ps1
