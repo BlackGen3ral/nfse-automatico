@@ -13,6 +13,14 @@ let busy = false;
 let starting = false;
 let initializing = true;
 let draftKey;
+const boundId = new URLSearchParams(location.search).get("tabId");
+const targetTabId = boundId && /^\d+$/.test(boundId) ? Number(boundId) : null;
+document.getElementById("close-panel").addEventListener("click", () => window.close());
+async function targetTab() {
+  if (targetTabId !== null) return chrome.tabs.get(targetTabId);
+  const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
+  return active;
+}
 document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
 async function refreshUpdater() {
   const indicator = document.querySelector("#update-dot");
@@ -113,7 +121,7 @@ for (const choice of suspensionChoices) choice.addEventListener("change", onDraf
 
 async function initialize() {
   renderButton();
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  tab = await targetTab();
   if (tab?.id != null) {
     draftKey = "nfsePopupDraft:" + tab.id;
     const saved = (await chrome.storage.session.get(draftKey))[draftKey];
@@ -129,7 +137,7 @@ async function initialize() {
   await refresh();
 }
 async function refresh() {
-  [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+  tab = await targetTab();
   const key = "nfseFlow:" + tab?.id;
   const flow = (await chrome.storage.session.get(key))[key];
   const current = flow?.until > Date.now() ? flow : null;
@@ -197,4 +205,11 @@ chrome.storage.onChanged.addListener((changes, area) => {
   if (changes["nfseFlow:" + tab?.id]) refresh().catch(() => {});
 });
 chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id) refresh().catch(() => {}); });
+chrome.tabs.onRemoved.addListener((id) => {
+  if (id !== tab?.id) return;
+  tab = null;
+  busy = starting = false;
+  renderButton();
+  show("A guia do portal foi fechada. Abra a extensão pela guia que deseja usar.");
+});
 initialize().catch(() => show("Não foi possível localizar o portal.", true));

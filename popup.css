@@ -10,10 +10,10 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 /* A janela do Chrome é medida a partir do conteúdo do popup. */
-html, body { width: 476px; min-width: 476px; }
-body { max-height: 590px; margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+html, body { width: 100%; min-width: 380px; height: 100%; }
+body { margin: 0; display: flex; flex-direction: column; overflow: hidden; }
 .hero {
-  flex: none; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 11px;
+  flex: none; display: grid; grid-template-columns: 44px minmax(0,1fr) auto auto; align-items: center; gap: 9px;
   padding: 14px 16px; color: white;
   background: radial-gradient(ellipse at 95% -25%, #41876b, transparent 64%),
     repeating-linear-gradient(135deg, #c0ffd40a 0 1px, transparent 1px 13px), #102f26;
@@ -24,7 +24,9 @@ h1 { margin: 0; font-size: 22px; line-height: 1.04; letter-spacing: -.04em; }
 .eyebrow { margin: 0 0 4px; color: #a6e9c8; font-size: 9px; font-weight: 800; letter-spacing: .15em; }
 .subtitle { margin: 4px 0 0; color: #d0e8db; font-size: 11px; }
 .version { align-self: start; padding: 4px 7px; border: 1px solid #b7e7cf5e; border-radius: 999px; color: #ecfff1; font: 10px ui-monospace, Consolas, monospace; white-space: nowrap; }
-main { min-height: 0; overflow: hidden auto; padding: 14px 17px 11px; }
+main { flex: 1; min-height: 0; overflow: hidden auto; padding: 14px 17px 11px; }
+#close-panel { display:grid;place-items:center;min-height:28px;width:28px;padding:0;border:1px solid #b7e7cf5e;border-radius:7px;background:#ffffff0c;color:#edfff4;font-size:20px;align-self:start; }
+#close-panel:hover { background:#ffffff26; }
 .portal-access { margin-bottom: 8px; }
 .portal-access a { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid #b9d9c5; border-radius: 8px; background: #e1f0e5; color: #17583f; font-size: 11px; text-decoration: none; }
 .portal-access a:hover { background: #d2e9dc; }

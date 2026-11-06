@@ -250,7 +250,15 @@
         .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
         .cursor{position:fixed;pointer-events:none;width:27px;height:33px;filter:drop-shadow(0 2px 2px #133a3040);transition:transform .22s ease;display:none;left:0;top:0}
         .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
-        @keyframes bob{50%{transform:translateY(-3px)}}
+        @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
+        @keyframes work-arm{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(-42deg)}}
+        @keyframes work-left{0%,100%{transform:rotate(18deg)}50%{transform:rotate(35deg)}}
+        @keyframes antenna-glow{50%{box-shadow:0 0 11px #bcffba;filter:brightness(1.2)}}
+        @keyframes hello{0%,100%{transform:rotate(-125deg)}20%,60%{transform:rotate(-145deg)}40%,80%{transform:rotate(-110deg)}}
+        .card[data-mood=working] .hand{animation:work-arm 1.6s ease-in-out infinite}
+        .card[data-mood=working] .arm-left{animation:work-left 1.6s ease-in-out infinite}
+        .card[data-mood=working] .antenna:before{animation:antenna-glow 1.8s ease-in-out infinite}
+        .card[data-mood=review] .hand{animation:hello 1.2s ease-in-out 2}
         @keyframes blink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.1)}}
         @keyframes pulse{50%{box-shadow:0 0 0 4px #8ee9b216,0 0 21px #79e5ab60}}
         @keyframes arrive{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
