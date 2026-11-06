@@ -208,13 +208,13 @@
       <style>
         :host{font:13px/1.4 system-ui,sans-serif;color:#183f32}
         *{box-sizing:border-box}
-        .card{width:min(352px,calc(100vw - 36px));border:1px solid #b2d3be;border-radius:16px;background:#f7fff9;box-shadow:0 9px 35px #123f3030;pointer-events:auto;overflow:hidden}
-        .top{display:flex;align-items:center;gap:12px;padding:14px 14px 9px}
-        .brand{font-size:10px;letter-spacing:.12em;color:#3e7357;font-weight:750}
-        h2{font-size:15px;margin:2px 0;color:#173e2d}
+        .card{position:relative;isolation:isolate;width:min(368px,calc(100vw - 36px));border:1px solid #68c49b66;border-radius:20px;background:radial-gradient(ellipse at 10% 0%,#285e4a 0%,transparent 64%),linear-gradient(145deg,#132f28,#081d18);color:#e6f5ec;font:13px/1.5 "Segoe UI",system-ui,sans-serif;box-shadow:0 18px 55px #00170f59,inset 0 1px #b9f9d628;pointer-events:auto;overflow:hidden;animation:arrive .42s cubic-bezier(.2,.8,.2,1) both}
+        .top{position:relative;display:flex;align-items:center;gap:14px;padding:19px 16px 12px}
+        .brand{font-size:9px;letter-spacing:.15em;color:#a4dabf;font-weight:750}
+        h2{font:700 17px/1.25 "Segoe UI",system-ui,sans-serif;letter-spacing:-.02em;margin:5px 0 0;color:#f1fff6}
         .controls{margin-left:auto;display:flex;align-self:flex-start;gap:3px}
-        button{border:0;background:#e1f0e6;color:#25583e;border-radius:6px;padding:3px 7px;font:inherit;cursor:pointer}
-        button:focus-visible{outline:2px solid #08714f}
+        button{border:1px solid #c0f2d521;background:#ffffff0b;color:#c2e6d1;border-radius:7px;padding:3px 7px;font:13px/1.3 "Segoe UI",system-ui,sans-serif;cursor:pointer}button:hover{background:#ffffff1f}
+        button:focus-visible{outline:2px solid #9becbf;outline-offset:2px}
         .robot{position:relative;flex:none;width:66px;height:72px;animation:bob 2.8s ease-in-out infinite;filter:drop-shadow(0 3px 2px #0b4b2320)}
         .antenna{position:absolute;left:32px;top:0;width:3px;height:12px;background:#367b5c}
         .antenna:before{content:"";position:absolute;left:-3px;top:0;width:9px;height:9px;border:2px solid #418c64;border-radius:50%;background:#c6ffb3;box-shadow:0 0 6px #bcffba}
@@ -232,15 +232,15 @@
         .card[data-mood=review] .eye{height:5px;background:transparent;border-top:3px solid #baffd5;border-radius:6px 6px 0 0}
         .card[data-mood=review] .hand{transform:rotate(-125deg);height:19px}
         .card[data-mood=error] .eye{transform:rotate(-12deg)}
-        .message{margin:0;padding:0 14px 12px;font-size:13px;min-height:42px}
-        ol{display:grid;grid-template-columns:repeat(4,1fr);padding:10px 9px;margin:0;border-top:1px solid #d8eadd;list-style:none;background:#edf7ef}
-        li{text-align:center;font-size:10px;color:#526d5c}
-        li span{display:grid;place-items:center;margin:0 auto 4px;width:22px;height:22px;border-radius:7px;background:#dcece0;font-weight:750}
-        li[data-state=active]{color:#075d3d;font-weight:750}
-        li[data-state=active] span{background:#08734e;color:white;box-shadow:0 0 0 3px #c1e7ce;animation:pulse 1.8s infinite}
-        li[data-state=done] span{background:#bfe6cc;color:#165238}
+        .message{position:relative;margin:0 16px 16px;padding:10px 12px;border:1px solid #93dcb129;border-radius:10px;background:#001a122e;color:#d7ecdf;font:13px/1.5 "Segoe UI",system-ui,sans-serif;min-height:44px}
+        ol{position:relative;display:grid;grid-template-columns:repeat(4,1fr);padding:13px 11px 15px;margin:0;border-top:1px solid #81cc9d25;list-style:none;background:#05171150}
+        li{position:relative;text-align:center;font:11px/1.4 "Segoe UI",system-ui,sans-serif;color:#a5c4b1}li:before{content:"";position:absolute;top:13px;left:-29%;width:58%;height:1px;background:#6b9b7b52}li:first-child:before{display:none}li[data-state=done]+li:before{background:#78dca3}
+        li span{position:relative;display:grid;place-items:center;margin:0 auto 6px;width:27px;height:27px;border:1px solid #8ebd9e47;border-radius:9px;background:#15362b;color:#c3ddcb;font-weight:750;transition:background .25s,box-shadow .25s}
+        li[data-state=active]{color:#ecfff3;font-weight:750}
+        li[data-state=active] span{background:#a5efc2;color:#103c29;border-color:#d0ffdf;box-shadow:0 0 16px #79e5ab55;animation:pulse 2.2s ease-in-out infinite}
+        li[data-state=done] span{background:#245a40;color:#b0f2c7;border-color:#77c59155}
         .card[data-mood=error]{border-color:#c79257}
-        .card[data-mood=error] h2{color:#85501f}
+        .card[data-mood=error] h2{color:#ffe2b6}.card[data-mood=error] .message{border-color:#e5b56b50;color:#ffebce}
         .card[data-mood=error] .robot,.card[data-mood=review] .robot{animation:none}
         .card[data-mood=review] .hand:after{content:"";position:absolute;width:5px;height:8px;left:-4px;bottom:2px;border-radius:3px;background:#b6ebc3;border:1px solid #397c57}
         .card[data-mood=review] .smile{height:6px;border-bottom-width:3px}
@@ -252,8 +252,13 @@
         .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
         @keyframes bob{50%{transform:translateY(-3px)}}
         @keyframes blink{0%,44%,48%,100%{transform:scaleY(1)}46%{transform:scaleY(.1)}}
-        @keyframes pulse{50%{box-shadow:0 0 0 5px #c1e7ce50}}
-        @media(prefers-reduced-motion:reduce){*,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
+        @keyframes pulse{50%{box-shadow:0 0 0 4px #8ee9b216,0 0 21px #79e5ab60}}
+        @keyframes arrive{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+        @keyframes sweep{0%,70%{transform:translateX(-160%) skewX(-18deg);opacity:0}78%{opacity:.7}100%{transform:translateX(180%) skewX(-18deg);opacity:0}}
+        .card:before{content:"";position:absolute;z-index:-1;inset:-30%;background:linear-gradient(90deg,transparent,#abffd30c,transparent);pointer-events:none;animation:sweep 6s ease-in-out infinite}
+        .card[data-mood=review]{border-color:#a7efc780;box-shadow:0 18px 55px #00170f59,0 0 25px #80d7a21a}.card[data-mood=review]:before,.card[data-mood=error]:before{animation:none;opacity:0}
+        .robot{filter:drop-shadow(0 5px 8px #001c1b80)}
+        @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
       </style>
       <div class="target" aria-hidden="true"></div>
       <svg class="cursor" viewBox="0 0 27 33" aria-hidden="true"><path d="M3 2v25l6-7 5 10 5-3-5-9 10-1Z" fill="#fff" stroke="#08734e" stroke-width="2" stroke-linejoin="round"/></svg>
@@ -273,7 +278,7 @@
     const ring = root.querySelector(".target");
     const cursor = root.querySelector("svg");
     const click = root.querySelector(".click");
-    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0;
+    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0, lastStage = null;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
     function clearTarget() {
@@ -306,6 +311,11 @@
       show(next, text) {
         attach(); phase = next; baseText = text; message.textContent = text;
         const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
+        const stage = next === "error" ? "error" : next === "review-ready" ? "review" : String(index);
+        if (lastStage !== null && stage !== lastStage && !reduced()) {
+          message.animate?.([{opacity:.3,transform:"translateY(4px)"},{opacity:1,transform:"translateY(0)"}],{duration:240,easing:"ease-out"});
+        }
+        lastStage = stage;
         card.dataset.mood = next === "error" ? "error" : next === "review-ready" ? "review" : "working";
         title.textContent = next === "error" ? "Preciso da sua ajuda" : next === "review-ready" ? "Agora é com você!" : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
         root.querySelectorAll("li").forEach((item,i) => {
