@@ -1,6 +1,6 @@
 # NFS-e Automático
 
-O painel de progresso acompanha Pessoas, Serviço, Valores e Revisão com um mascote verde animado, cursor ilustrativo e destaque nos campos acionados. Use os botões do cartão para recolher e fechar. A animação respeita o movimento reduzido do Windows.
+O assistente com mascote aparece apenas quando o preenchimento chega à revisão. O aviso mostra uma contagem regressiva de 7 segundos e fecha automaticamente. Você também pode fechá-lo pelo X. A emissão continua manual no portal.
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 

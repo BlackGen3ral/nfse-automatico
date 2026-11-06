@@ -267,6 +267,7 @@
         .card[data-mood=review]{border-color:#a7efc780;box-shadow:0 18px 55px #00170f59,0 0 25px #80d7a21a}.card[data-mood=review]:before,.card[data-mood=error]:before{animation:none;opacity:0}
         .robot{filter:drop-shadow(0 5px 8px #001c1b80)}
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
+        .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
       </style>
       <div class="target" aria-hidden="true"></div>
       <svg class="cursor" viewBox="0 0 27 33" aria-hidden="true"><path d="M3 2v25l6-7 5 10 5-3-5-9 10-1Z" fill="#fff" stroke="#08734e" stroke-width="2" stroke-linejoin="round"/></svg>
@@ -279,6 +280,7 @@
         </div>
         <p class="message" role="status" aria-live="polite"></p>
         <ol aria-label="Progresso"><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol>
+        <p class="dismiss-countdown" aria-live="off"></p>
       </section>`;
     const card = root.querySelector(".card");
     const message = root.querySelector(".message");
@@ -286,7 +288,7 @@
     const ring = root.querySelector(".target");
     const cursor = root.querySelector("svg");
     const click = root.querySelector(".click");
-    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0, lastStage = null;
+    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0, lastStage = null, dismissTimer;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
     function clearTarget() {
@@ -305,7 +307,7 @@
       cursor.style.display = "block";
       cursor.style.transform = "translate(" + Math.min(r.right-8,innerWidth-30) + "px," + Math.max(0,r.top+r.height/2) + "px)";
     }
-    root.querySelector(".close").onclick = () => { dismissed = true; host.remove(); clearTarget(); };
+    root.querySelector(".close").onclick = () => { dismissed = true; clearInterval(dismissTimer); host.remove(); clearTarget(); };
     root.querySelector(".min").onclick = (event) => {
       const mini = card.dataset.mini !== "true";
       card.dataset.mini = String(mini);
@@ -317,7 +319,20 @@
     window.addEventListener("resize", position, {passive:true});
     return {
       show(next, text) {
-        attach(); phase = next; baseText = text; message.textContent = text;
+        clearInterval(dismissTimer);
+        phase = next; baseText = text;
+        if (next !== "review-ready") { host.remove(); clearTarget(); return; }
+        attach(); message.textContent = text;
+        const countdown = root.querySelector(".dismiss-countdown");
+        const closeAt = Date.now() + 7000;
+        countdown.textContent = "Fechando em 7 s…";
+        dismissTimer = setInterval(() => {
+          const seconds = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000));
+          if (!seconds) {
+            clearInterval(dismissTimer);
+            host.remove(); clearTarget();
+          } else countdown.textContent = "Fechando em " + seconds + " s…";
+        }, 1000);
         const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
         const stage = next === "error" ? "error" : next === "review-ready" ? "review" : String(index);
         if (lastStage !== null && stage !== lastStage && !reduced()) {
