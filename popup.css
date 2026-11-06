@@ -12,6 +12,8 @@
 /* A janela do Chrome é medida a partir do conteúdo do popup. */
 html, body { width: 100%; min-width: 380px; height: 100%; }
 body { margin: 0; display: flex; flex-direction: column; overflow: hidden; }
+html[data-panel=launcher],html[data-panel=launcher] body { width:476px;min-width:476px;height:auto;max-height:590px; }
+html[data-launching=true] main,html[data-launching=true] .action-dock { display:none; }
 .hero {
   flex: none; display: grid; grid-template-columns: 44px minmax(0,1fr) auto auto; align-items: center; gap: 9px;
   padding: 14px 16px; color: white;

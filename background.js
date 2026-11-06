@@ -42,27 +42,6 @@ chrome.tabs.onRemoved.addListener(async (id) => {
   await chrome.storage.session.remove([key(id), draftKey(id)]);
 });
 
-let panelQueue = Promise.resolve();
-async function openPanel(tab) {
-  if (tab?.id == null) return;
-  const storageKey = "nfseWindow:" + tab.id;
-  const url = chrome.runtime.getURL("popup.html") + "?tabId=" + tab.id;
-  const existing = (await chrome.storage.session.get(storageKey))[storageKey];
-  if (Number.isInteger(existing)) {
-    try {
-      const window = await chrome.windows.get(existing, {populate:true});
-      if (window.tabs?.some((item) => item.url === url)) {
-        await chrome.windows.update(existing, {focused:true, state:"normal"});
-        return;
-      }
-    } catch {}
-  }
-  const window = await chrome.windows.create({url, type:"popup", focused:true, width:508, height:740});
-  if (window?.id != null) await chrome.storage.session.set({[storageKey]:window.id});
-}
-chrome.action.onClicked.addListener((tab) => {
-  panelQueue = panelQueue.catch(() => {}).then(() => openPanel(tab)).catch(() => {});
-});
 chrome.windows.onRemoved.addListener(async (id) => {
   const entries = await chrome.storage.session.get(null);
   const keys = Object.keys(entries).filter((key) => key.startsWith("nfseWindow:") && entries[key] === id);

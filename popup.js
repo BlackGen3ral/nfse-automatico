@@ -15,6 +15,7 @@ let initializing = true;
 let draftKey;
 const boundId = new URLSearchParams(location.search).get("tabId");
 const targetTabId = boundId && /^\d+$/.test(boundId) ? Number(boundId) : null;
+document.documentElement.dataset.panel = targetTabId === null ? "launcher" : "window";
 document.getElementById("close-panel").addEventListener("click", () => window.close());
 async function targetTab() {
   if (targetTabId !== null) return chrome.tabs.get(targetTabId);
@@ -120,6 +121,37 @@ amount.addEventListener("input", () => {
 for (const choice of suspensionChoices) choice.addEventListener("change", onDraftEdit);
 
 async function initialize() {
+  let fallback = false;
+  if (targetTabId === null) {
+    document.documentElement.dataset.launching = "true";
+    try {
+      const active = await targetTab();
+      if (active?.id == null) throw new Error("Guia indisponível");
+      const url = chrome.runtime.getURL("popup.html") + "?tabId=" + active.id;
+      const key = "nfseWindow:" + active.id;
+      const existing = (await chrome.storage.session.get(key))[key];
+      let reused = false;
+      if (Number.isInteger(existing)) {
+        try {
+          const found = await chrome.windows.get(existing, {populate:true});
+          if (found.tabs?.some((item) => item.url === url)) {
+            await chrome.windows.update(existing, {focused:true,state:"normal"});
+            reused = true;
+          }
+        } catch {}
+      }
+      if (!reused) {
+        const created = await chrome.windows.create({url,type:"popup",focused:true,width:508,height:740});
+        if (created?.id == null) throw new Error("Janela indisponível");
+        await chrome.storage.session.set({[key]:created.id}).catch(() => {});
+      }
+      window.close();
+      return;
+    } catch {
+      fallback = true;
+      document.documentElement.dataset.launching = "false";
+    }
+  }
   renderButton();
   tab = await targetTab();
   if (tab?.id != null) {
@@ -135,6 +167,7 @@ async function initialize() {
   }
   initializing = false;
   await refresh();
+  if (fallback) show("Não foi possível abrir a janela. Você pode usar este painel.", true);
 }
 async function refresh() {
   tab = await targetTab();
