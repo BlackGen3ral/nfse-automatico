@@ -4,6 +4,7 @@
   let running = false;
   const peoplePath = /\/DPS\/Pessoas(?:\/|$)/i;
   const servicePath = /\/DPS\/Servi(?:c|ç|%c3%a7)o(?:\/|$)/i;
+  const valuesPath = /\/DPS\/Tributacao(?:\/|$)/i;
 
   function cnpjInEmitterHeader() {
     const text = Array.from(document.querySelectorAll("body *"))
@@ -145,24 +146,27 @@
     }
   }
 
-  function findRadio(scope, optionText) {
+  function findRadio(scope, optionText, group) {
     if (!scope) return null;
     const wanted = norm(optionText);
+    const matchesGroup = (input) => input?.matches?.("input[type=radio]") &&
+      (group === undefined || input.name === group);
     for (const label of scope.querySelectorAll("label")) {
       if (norm(label.innerText || label.textContent) === wanted) {
         const input = label.control || label.querySelector("input[type=radio]") || (label.htmlFor && document.getElementById(label.htmlFor));
-        if (input?.matches?.("input[type=radio]")) return input;
+        if (matchesGroup(input)) return input;
       }
     }
     for (const radio of scope.querySelectorAll("input[type=radio]")) {
+      if (!matchesGroup(radio)) continue;
       const wrapper = radio.closest("label") || radio.parentElement;
       if (norm(wrapper?.innerText || wrapper?.textContent) === wanted) return radio;
     }
     return null;
   }
 
-  function chooseRadio(scope, optionText) {
-    const radio = findRadio(scope, optionText);
+  function chooseRadio(scope, optionText, group) {
+    const radio = findRadio(scope, optionText, group);
     if (!radio || radio.disabled) return !!radio?.checked;
     if (!radio.checked) {
       const label = Array.from(radio.labels || []).find((item) =>
@@ -210,11 +214,11 @@
     statusBox.firstElementChild.textContent = text;
   }
 
-  function update(phase, text) {
+  function update(phase, text, valuesDraft = null) {
     showStatus(phase, text);
     return chrome.runtime.sendMessage({
       type: "nfse:update",
-      state: { phase, text, until: Date.now() + 120000 }
+      state: { phase, text, valuesDraft, until: Date.now() + (valuesDraft ? 1800000 : 120000) }
     });
   }
 
@@ -360,7 +364,54 @@
     await attempt(() => select("Item da NBS", "ServicoPrestado_CodigoNBS", "120012000"));
     await attempt(() => select("Código indicador da operação", "ServicoPrestado_CodigoIndOp", "050101"));
     if (issues.length) throw new Error(issues.join(" · "));
-    await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.");
+    const draft = new URLSearchParams(location.search).get("idr");
+    await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.", draft);
+  }
+
+  function issqnRetentionNo() {
+    const scope = document.getElementById("pnlOperacaoTributavel");
+    if (!visible(scope)) return false;
+    const question = Array.from(scope.querySelectorAll("label,legend,p,span,div")).find((item) =>
+      norm(item.textContent).startsWith("ha retencao do issqn pelo tomador ou pelo intermediario") &&
+      !item.querySelector("input,select,textarea"));
+    if (!question) return false;
+    const following = Array.from(scope.querySelectorAll("input[type=radio],hr")).filter((item) =>
+      question.compareDocumentPosition(item) & Node.DOCUMENT_POSITION_FOLLOWING);
+    const [first, second] = following;
+    if (!first?.name || first.name !== second?.name ||
+        !first.matches("input[type=radio]") || !second.matches("input[type=radio]")) return false;
+    return chooseRadio(scope, "Não", first.name);
+  }
+
+  async function fillValues() {
+    await update("values", "Preenchendo Valores…");
+    const issues = [];
+    async function attempt(step) {
+      try { await step(); return true; }
+      catch (error) { issues.push(error.message); return false; }
+    }
+    const select = (label, id, code) => waitFor(label,
+      () => selectOption(document.getElementById(id), code), 12000);
+    await attempt(() => waitFor("Retenção do ISSQN", issqnRetentionNo));
+    const pisReady = await attempt(() => select("Situação Tributária do PIS/COFINS",
+      "TributacaoFederal_PISCofins_SituacaoTributaria", "00"));
+    if (pisReady) await attempt(() => select("Tipo de retenção do PIS/COFINS/CSLL",
+      "TributacaoFederal_PISCofins_TipoRetencao", "0"));
+    const ibsReady = await attempt(() => select("Código de Situação Tributária",
+      "ValorTributos_CodigoSituacaoTributaria", "000"));
+    if (ibsReady) await attempt(() => select("Código de Classificação Tributária",
+      "ValorTributos_CodigoClassificacaoTributaria", "000001"));
+
+    const rateModeReady = await attempt(() => applyRadio(() => panel("pnlValorTributos"),
+      "Informar alíquota do Simples Nacional", "Informar alíquota do Simples Nacional"));
+    if (rateModeReady) await attempt(() => waitFor("Alíquota do Simples Nacional", () => {
+      const field = document.getElementById("ValorTributos_AliquotaSN");
+      return visible(field) && !field.disabled && !field.readOnly &&
+        setNativeValue(field, "6,00") && field.value === "6,00";
+    }));
+
+    if (issues.length) throw new Error(issues.join(" · "));
+    await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
   }
 
   function report(error) {
@@ -368,11 +419,12 @@
   }
 
   async function resume() {
-    if (running || !servicePath.test(location.pathname)) return;
+    const inValues = valuesPath.test(location.pathname);
+    if (running || (!inValues && !servicePath.test(location.pathname))) return;
     running = true;
     try {
-      const flow = await chrome.runtime.sendMessage({ type: "nfse:claim" });
-      if (flow) await fillService();
+      const flow = await chrome.runtime.sendMessage({ type: inValues ? "nfse:claim-values" : "nfse:claim" });
+      if (flow) await (inValues ? fillValues() : fillService());
     } catch (error) {
       await report(error);
     } finally {
@@ -381,14 +433,15 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _, respond) => {
-    if (message.type === "nfse:start-service") {
-      if (running || !servicePath.test(location.pathname)) {
+    if (message.type === "nfse:start-service" || message.type === "nfse:start-values") {
+      const inValues = message.type === "nfse:start-values";
+      if (running || !(inValues ? valuesPath : servicePath).test(location.pathname)) {
         respond({ ok: false });
         return;
       }
       running = true;
       respond({ ok: true });
-      fillService().catch(report).finally(() => { running = false; }).catch(() => {});
+      (inValues ? fillValues() : fillService()).catch(report).finally(() => { running = false; }).catch(() => {});
       return;
     }
     if (message.type !== "nfse:start") return;

@@ -3,6 +3,7 @@ const button = document.querySelector("#fill");
 const status = document.querySelector("#status");
 const peopleUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Pessoas(?:[/?#]|$)/i;
 const serviceUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Servi(?:c|ç|%c3%a7)o(?:[/?#]|$)/i;
+const valuesUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Tributacao(?:[/?#]|$)/i;
 const digits = (value) => value.replace(/\D/g, "").slice(0, 14);
 let tab;
 let busy = false;
@@ -11,11 +12,13 @@ let starting = false;
 document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
 function renderButton() {
   const inService = serviceUrl.test(tab?.url || "");
-  document.querySelector("#people-fields").hidden = inService;
-  document.querySelector("#fill-label").textContent = inService ? "Preencher Serviço" : "Preencher";
-  input.disabled = inService;
+  const inValues = valuesUrl.test(tab?.url || "");
+  const withoutCnpj = inService || inValues;
+  document.querySelector("#people-fields").hidden = withoutCnpj;
+  document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher";
+  input.disabled = withoutCnpj;
   button.disabled = busy || starting ||
-    (!inService && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14));
+    (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14));
 }
 function show(message, error = false) {
   status.textContent = message;
@@ -35,14 +38,17 @@ async function refresh() {
   const key = "nfseFlow:" + tab?.id;
   const flow = (await chrome.storage.session.get(key))[key];
   const current = flow?.until > Date.now() ? flow : null;
-  busy = !!current && ["people", "waiting", "service"].includes(current.phase);
+  busy = !!current && ["people", "waiting", "service", "values"].includes(current.phase);
   const inService = serviceUrl.test(tab?.url || "");
+  const inValues = valuesUrl.test(tab?.url || "");
   document.querySelector("#people").classList.toggle("active", peopleUrl.test(tab?.url || ""));
   document.querySelector("#service").classList.toggle("active", inService);
+  document.querySelector("#values").classList.toggle("active", inValues);
   if (!starting) {
-    if (current && (busy || inService || peopleUrl.test(tab?.url || ""))) show(current.text, current.phase === "error");
+    if (current && (busy || inService || (inValues && !current.valuesDraft) || peopleUrl.test(tab?.url || ""))) show(current.text, current.phase === "error");
     else if (inService) show("A descrição e o avanço ficam com você.");
-    else show(peopleUrl.test(tab?.url || "") ? "Digite o CNPJ para começar." : "Abra Pessoas ou Serviço no Emissor Nacional.");
+    else if (inValues) show("Confira os valores antes de avançar.");
+    else show(peopleUrl.test(tab?.url || "") ? "Digite o CNPJ para começar." : "Abra Pessoas, Serviço ou Valores no Emissor Nacional.");
   }
   renderButton();
 }
@@ -53,7 +59,9 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
   renderButton();
   show("Iniciando preenchimento…");
   try {
-    const message = serviceUrl.test(tab.url) ? { type: "nfse:start-service" } : { type: "nfse:start", cnpj: digits(input.value) };
+    let message = { type: "nfse:start", cnpj: digits(input.value) };
+    if (serviceUrl.test(tab.url)) message = { type: "nfse:start-service" };
+    if (valuesUrl.test(tab.url)) message = { type: "nfse:start-values" };
     const reply = await chrome.tabs.sendMessage(tab.id, message);
     if (!reply?.ok) throw new Error();
     input.value = "";
