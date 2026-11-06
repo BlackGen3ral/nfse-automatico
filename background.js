@@ -42,8 +42,4 @@ chrome.tabs.onRemoved.addListener(async (id) => {
   await chrome.storage.session.remove([key(id), draftKey(id)]);
 });
 
-chrome.windows.onRemoved.addListener(async (id) => {
-  const entries = await chrome.storage.session.get(null);
-  const keys = Object.keys(entries).filter((key) => key.startsWith("nfseWindow:") && entries[key] === id);
-  if (keys.length) await chrome.storage.session.remove(keys);
-});
+chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error("Não foi possível configurar o painel NFS-e", error));

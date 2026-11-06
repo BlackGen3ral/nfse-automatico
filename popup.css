@@ -10,10 +10,8 @@
 * { box-sizing: border-box; }
 [hidden] { display: none !important; }
 /* A janela do Chrome é medida a partir do conteúdo do popup. */
-html, body { width: 100%; min-width: 380px; height: 100%; }
+html, body { width: 100%; min-width: 0; height: 100%; }
 body { margin: 0; display: flex; flex-direction: column; overflow: hidden; }
-html[data-panel=launcher],html[data-panel=launcher] body { width:476px;min-width:476px;height:auto;max-height:590px; }
-html[data-launching=true] main,html[data-launching=true] .action-dock { display:none; }
 .hero {
   flex: none; display: grid; grid-template-columns: 44px minmax(0,1fr) auto auto; align-items: center; gap: 9px;
   padding: 14px 16px; color: white;
@@ -81,3 +79,5 @@ button:disabled { color: #486255; background: #dceae0; cursor: default; }
 #update-dot[data-state="on"] { background: #148255; box-shadow: 0 0 0 2px #d8ebdf; }
 #update-dot[data-state="attention"] { background: #9a6111; box-shadow: 0 0 0 2px #f6e9cb; }
 a { color: #08684e; font-weight: 700; }
+
+@media(max-width:420px){.hero{grid-template-columns:36px minmax(0,1fr) auto;gap:7px;padding:12px}.hero img{width:36px;height:36px}.version{display:none}h1{font-size:19px}.subtitle{font-size:10px}.invoice-details{grid-template-columns:1fr;gap:8px}main{padding:10px}.action-dock{padding:8px 10px}.form-intro{margin-bottom:8px}}

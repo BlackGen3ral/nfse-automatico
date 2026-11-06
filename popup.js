@@ -13,12 +13,17 @@ let busy = false;
 let starting = false;
 let initializing = true;
 let draftKey;
-const boundId = new URLSearchParams(location.search).get("tabId");
-const targetTabId = boundId && /^\d+$/.test(boundId) ? Number(boundId) : null;
-document.documentElement.dataset.panel = targetTabId === null ? "launcher" : "window";
-document.getElementById("close-panel").addEventListener("click", () => window.close());
+let refreshSequence = 0;
+async function closePanel() {
+  try {
+    const current = await chrome.windows.getCurrent();
+    await chrome.sidePanel.close({ windowId: current.id });
+  } catch {
+    show("Use o X da lateral do Chrome para fechar o painel.", true);
+  }
+}
+document.getElementById("close-panel").addEventListener("click", closePanel);
 async function targetTab() {
-  if (targetTabId !== null) return chrome.tabs.get(targetTabId);
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   return active;
 }
@@ -121,58 +126,32 @@ amount.addEventListener("input", () => {
 for (const choice of suspensionChoices) choice.addEventListener("change", onDraftEdit);
 
 async function initialize() {
-  let fallback = false;
-  if (targetTabId === null) {
-    document.documentElement.dataset.launching = "true";
-    try {
-      const active = await targetTab();
-      if (active?.id == null) throw new Error("Guia indisponível");
-      const url = chrome.runtime.getURL("popup.html") + "?tabId=" + active.id;
-      const key = "nfseWindow:" + active.id;
-      const existing = (await chrome.storage.session.get(key))[key];
-      let reused = false;
-      if (Number.isInteger(existing)) {
-        try {
-          const found = await chrome.windows.get(existing, {populate:true});
-          if (found.tabs?.some((item) => item.url === url)) {
-            await chrome.windows.update(existing, {focused:true,state:"normal"});
-            reused = true;
-          }
-        } catch {}
-      }
-      if (!reused) {
-        const created = await chrome.windows.create({url,type:"popup",focused:true,width:508,height:740});
-        if (created?.id == null) throw new Error("Janela indisponível");
-        await chrome.storage.session.set({[key]:created.id}).catch(() => {});
-      }
-      window.close();
-      return;
-    } catch {
-      fallback = true;
-      document.documentElement.dataset.launching = "false";
-    }
-  }
   renderButton();
-  tab = await targetTab();
-  if (tab?.id != null) {
-    draftKey = "nfsePopupDraft:" + tab.id;
-    const saved = (await chrome.storage.session.get(draftKey))[draftKey];
-    if (saved) {
-      input.value = mask(digits(saved.cnpj || ""));
-      description.value = saved.description || "";
-      amount.value = saved.amount || "";
-      setSuspension(saved.suspension === "yes" ? "yes" : "no");
-      showAmountHint();
-    }
-  }
-  initializing = false;
   await refresh();
-  if (fallback) show("Não foi possível abrir a janela. Você pode usar este painel.", true);
 }
 async function refresh() {
-  tab = await targetTab();
+  const sequence = ++refreshSequence;
+  const nextTab = await targetTab();
+  if (sequence !== refreshSequence) return;
+  if (tab?.id !== nextTab?.id || initializing) {
+    initializing = true;
+    renderButton();
+    const nextKey = nextTab?.id == null ? null : "nfsePopupDraft:" + nextTab.id;
+    const saved = nextKey ? (await chrome.storage.session.get(nextKey))[nextKey] : null;
+    if (sequence !== refreshSequence) return;
+    tab = nextTab;
+    draftKey = nextKey;
+    input.value = mask(digits(saved?.cnpj || ""));
+    description.value = saved?.description || "";
+    amount.value = saved?.amount || "";
+    setSuspension(saved?.suspension === "yes" ? "yes" : "no");
+    showAmountHint();
+    busy = starting = false;
+    initializing = false;
+  } else { tab = nextTab; }
   const key = "nfseFlow:" + tab?.id;
   const flow = (await chrome.storage.session.get(key))[key];
+  if (sequence !== refreshSequence) return;
   const current = flow?.until > Date.now() ? flow : null;
   const inService = serviceUrl.test(tab?.url || "");
   const inValues = valuesUrl.test(tab?.url || "");
@@ -216,7 +195,7 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
       return;
     }
     if (message.type === "nfse:start") {
-      window.close();
+      await closePanel();
       return;
     }
     starting = false;
@@ -237,6 +216,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (changes["nfseFlow:" + tab?.id]) refresh().catch(() => {});
 });
+chrome.tabs.onActivated.addListener(() => refresh().catch(() => {}));
 chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id) refresh().catch(() => {}); });
 chrome.tabs.onRemoved.addListener((id) => {
   if (id !== tab?.id) return;
