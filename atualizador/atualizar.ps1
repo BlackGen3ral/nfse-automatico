@@ -141,13 +141,18 @@ try {
         elseif (!$pending) { Write-Status 'current' $local.version $checkedAt }
     }
     if ($pending) {
-        if (Install-Update $pending) {
-            Remove-Item -LiteralPath $pendingPath
-            Write-Status 'current' $pending.version $checkedAt
-        }
-        elseif ($checked -or $status.state -ne 'waiting-close' -or $status.version -ne $pending.version) {
+        if ($checked -or $status.state -ne 'waiting-close' -or $status.version -ne $pending.version) {
             Write-Status 'waiting-close' $pending.version $checkedAt
         }
+        # Aguarda a janela de instalação sem depender do intervalo da tarefa.
+        do {
+            while (Get-Process -Name chrome,msedge -ErrorAction SilentlyContinue) {
+                Start-Sleep -Milliseconds 300
+            }
+            $installed = Install-Update $pending
+        } until ($installed)
+        Remove-Item -LiteralPath $pendingPath
+        Write-Status 'current' $pending.version $checkedAt
     }
 } catch {
     Write-Status 'error' $null $checkedAt

@@ -30,7 +30,7 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\ativar.ps1
 
 O Agendador do Windows consulta a branch `main` do GitHub na sua conta. A primeira verificação começa na ativação e, depois, ocorre a cada hora. A tarefa usa um iniciador silencioso para rodar em segundo plano. Se a tarefa já existia antes da versão 0.2.9, execute a ativação novamente para trocar o iniciador.
 
-Uma versão nova é baixada e verificada mesmo com o navegador aberto. O painel mostra quando ela está pronta. Feche Chrome e Edge por completo, incluindo processos em segundo plano, para que a instalação ocorra na mesma pasta em até dois minutos. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
+Uma versão nova é baixada e verificada mesmo com o navegador aberto. O painel mostra quando ela está pronta. Com uma atualização pendente, o atualizador aguarda em segundo plano até Chrome e Edge fecharem por completo, incluindo processos em segundo plano. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
 
 Para desativar:
 
