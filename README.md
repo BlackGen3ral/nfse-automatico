@@ -4,6 +4,8 @@ Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacion
 
 O atalho **Abrir Emissor Nacional** leva à etapa **Pessoas** em uma nova guia.
 
+Use **Entrar com certificado** para ir direto ao acesso por certificado digital do Emissor Nacional. Se o navegador apresentar a lista de certificados ou solicitar o PIN, conclua essa etapa na janela do navegador.
+
 O fluxo pesquisa os CNPJs em **Pessoas**, aplica a configuração tributária e a descrição em **Serviço**, informa o valor e os códigos combinados em **Valores** e avança para a **Revisão**. Você confere os dados e confirma a emissão no portal.
 
 No painel inicial, **Exigibilidade do ISSQN suspensa?** começa em **Não** para cada nota. Se marcar **Sim**, a extensão leva a escolha para **Valores** e indica quando o portal exigir dados adicionais para continuar. Essa opção é separada da retenção do ISSQN.
