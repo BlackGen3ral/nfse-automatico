@@ -2,11 +2,13 @@
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão, digite o **CNPJ do tomador** e clique em **Preencher**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
-O fluxo marca **Sim** em **Preencher as informações IBS/CBS?** quando a pergunta aparece, para liberar a data e os campos combinados. Em seguida, pesquisa os CNPJs e, quando a etapa **Pessoas** está pronta, aciona **Avançar**. Em **Serviço**, aplica Brasil, Pimenta Bueno/RO, tributação 140201, ISSQN Não, NBS 120012000 e operação 050101. Preencha a descrição, revise os dados e emita manualmente.
+O fluxo marca **Sim** em **Preencher as informações IBS/CBS?** quando a pergunta aparece, para liberar a data e os campos combinados. Em seguida, pesquisa os CNPJs e, quando a etapa **Pessoas** está pronta, aciona **Avançar**. Ao abrir **Serviço**, pesquisa Pimenta Bueno/RO e o código 140201 nos controles do portal. Depois aplica ISSQN Não, NBS 120012000 e operação 050101. O fluxo para nessa etapa para você completar a descrição, revisar e avançar manualmente.
+
+Se já estiver na etapa **Serviço**, abra o painel e clique em **Preencher Serviço**. Esse botão aplica os mesmos valores sem pedir CNPJ.
 
 O andamento aparece na página do portal. Se algum campo ou pesquisa não puder ser confirmado, a extensão indica o que ficou pendente e aguarda a revisão.
 
-A extensão lê as exceções da versão anterior quando o CNPJ do emitente corresponde a um perfil local. O CNPJ digitado no painel substitui os CNPJs cadastrados naquela execução. O número vai ao Emissor Nacional pela pesquisa do próprio portal. O atualizador consulta apenas os arquivos públicos do GitHub.
+A extensão lê as exceções da etapa Pessoas quando o CNPJ do emitente corresponde a um perfil local. O CNPJ digitado no painel substitui os CNPJs cadastrados naquela execução. O número vai ao Emissor Nacional pela pesquisa do próprio portal. O atualizador consulta apenas os arquivos públicos do GitHub.
 
 ## Instalação
 
@@ -32,5 +34,5 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.
 
 ## Validação no portal
 
-O formulário aberto no Emissor Nacional confirmou que a data começa desabilitada e que a pergunta de IBS/CBS aparece antes dela. O preenchimento, as pesquisas, o avanço e a indicação de pendências foram verificados com um formulário simulado e dados fictícios. Falta validar a execução completa da versão 0.2.1 no portal e a atualização agendada em uso real.
+Os controles foram identificados no Emissor Nacional. A busca e a seleção em Serviço foram verificadas com Select2 e respostas simuladas, incluindo o fluxo automático, o botão manual e a falta de um resultado. A execução completa da versão 0.2.2 no portal real e a atualização agendada ainda precisam de validação.
 

@@ -86,6 +86,65 @@
     return setNativeValue(element, option.value) && element.value === option.value;
   }
 
+  function select2LabelMatches(label, wanted) {
+    const text = norm(label);
+    if (/^\d+$/.test(wanted)) {
+      const code = text.replace(/\s/g, "").match(/^\d+/)?.[0];
+      return code === wanted;
+    }
+    return text === norm(wanted) || text === "pimenta bueno rondonia";
+  }
+
+  function pressWidgetKey(element, key, code) {
+    element.dispatchEvent(new KeyboardEvent("keydown", {
+      key, keyCode: code, which: code, bubbles: true, cancelable: true
+    }));
+  }
+
+  async function searchSelect2(label, id, wanted, terms) {
+    const field = () => document.getElementById(id);
+    const selection = () => document.getElementById("select2-" + id + "-container")?.closest(".select2-selection");
+    const selected = () => {
+      const option = field()?.selectedOptions?.[0];
+      return !!option?.value && (option.value === wanted || select2LabelMatches(option.textContent, wanted));
+    };
+    const control = await waitFor(label, () => {
+      const widget = selection();
+      return field() && !field().disabled && visible(widget) && widget;
+    }, 12000);
+    if (selected()) return;
+    if (control.getAttribute("aria-expanded") !== "true") {
+      pressWidgetKey(control, "Enter", 13);
+    }
+    try {
+      const listId = "select2-" + id + "-results";
+      const search = await waitFor(label + " · caixa de busca", () => {
+        if (control.getAttribute("aria-expanded") !== "true") return null;
+        const owned = document.querySelector(".select2-search__field[aria-controls='" + listId + "']");
+        return owned || document.querySelector(".select2-container--open .select2-search__field");
+      });
+      for (const term of terms) {
+        search.value = term;
+        search.dispatchEvent(new Event("input", { bubbles: true }));
+        const result = await waitFor(label + " · resultado", () => {
+          const list = document.getElementById(listId);
+          return Array.from(list?.querySelectorAll("li[aria-selected], li.select2-results__option--selectable") || [])
+            .find((item) => visible(item) && item.getAttribute("aria-disabled") !== "true" &&
+              select2LabelMatches(item.textContent, wanted));
+        }, 4500).catch(() => null);
+        if (!result) continue;
+        result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
+        await waitFor(label + " · seleção", selected);
+        return;
+      }
+      throw new Error(label + " · resultado");
+    } finally {
+      if (control.getAttribute("aria-expanded") === "true") {
+        pressWidgetKey(control, "Escape", 27);
+      }
+    }
+  }
+
   function findRadio(scope, optionText) {
     if (!scope) return null;
     const wanted = norm(optionText);
@@ -120,8 +179,7 @@
   }
 
   const defaults = {
-    municipality: "Pimenta Bueno/RO", taxCode: "140201", nbs: "120012000", operation: "050101",
-    issqnImune: false, governmentPurchase: false, recipientIsAcquirer: false,
+    governmentPurchase: false, recipientIsAcquirer: false,
     customerLocation: "Brasil", recipientLocation: "Brasil", intermediary: "Intermediário não informado"
   };
 
@@ -152,11 +210,11 @@
     statusBox.firstElementChild.textContent = text;
   }
 
-  function update(phase, text, extra = {}) {
+  function update(phase, text) {
     showStatus(phase, text);
     return chrome.runtime.sendMessage({
       type: "nfse:update",
-      state: { phase, text, until: Date.now() + (phase === "waiting" ? 25000 : 120000), ...extra }
+      state: { phase, text, until: Date.now() + 120000 }
     });
   }
 
@@ -261,39 +319,48 @@
       throw new Error("Campos obrigatórios da etapa Pessoas");
     }
 
-    const { municipality, taxCode, nbs, operation, issqnImune } = settings;
-    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…", {
-      service: { municipality, taxCode, nbs, operation, issqnImune }
-    });
+    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…");
     if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
     next.click();
     setTimeout(() => {
       if (peoplePath.test(location.pathname)) {
         update("error", "O portal permaneceu em Pessoas. Confira os avisos da página antes de avançar.").catch(() => {});
       }
-    }, 25000);
+    }, 120000);
   }
 
-  async function fillService(settings) {
-    showStatus("service", "Preenchendo Serviço…");
+  async function fillService() {
+    await update("service", "Preenchendo Serviço…");
     const scope = document.querySelector("main, #main-content") || document;
-    const select = (label, pattern, value) => waitFor(label, () => selectOption(findControl(scope, pattern), value));
-    await select("País", /^pais$/, "Brasil");
-    await select("Município", /^municipio$/, settings.municipality);
-    await select("Código de Tributação Nacional", /codigo de tributacao nacional/, settings.taxCode);
+    const select = (label, id, value) => waitFor(label, () => selectOption(document.getElementById(id), value), 12000);
+    const issues = [];
+    async function attempt(step) {
+      try { await step(); } catch (error) { issues.push(error.message); }
+    }
+    await attempt(async () => {
+      await select("País", "LocalPrestacao_CodigoPaisPrestacao", "Brasil");
+      showStatus("service", "Buscando Pimenta Bueno/RO…");
+      await searchSelect2("Município", "LocalPrestacao_CodigoMunicipioPrestacao", "Pimenta Bueno/RO", ["Pimenta Bueno"]);
+      showStatus("service", "Buscando o código de tributação 140201…");
+      await searchSelect2("Código de Tributação Nacional", "ServicoPrestado_CodigoTributacaoNacional", "140201", ["140201", "14.02.01"]);
+    });
     const issqn = () => {
-      const label = Array.from(scope.querySelectorAll("label,legend,p,span")).find((element) =>
-        norm(element.textContent).includes("o servico fornecimento prestado e um caso de imunidade"));
+      const panel = document.getElementById("pnlServicoPrestado") || scope;
+      const label = Array.from(panel.querySelectorAll("label,legend,p,span,div")).find((element) =>
+        norm(element.textContent).startsWith("o servico fornecimento prestado e um caso de imunidade") &&
+        !element.querySelector("input,select,textarea"));
       if (!label) return null;
       for (let item = label.parentElement; item && item !== scope; item = item.parentElement) {
         if (findRadio(item, "Sim") && findRadio(item, "Não")) return item;
       }
       return null;
     };
-    await applyRadio(issqn, "Imunidade, exportação ou não incidência do ISSQN", settings.issqnImune ? "Sim" : "Não");
-    await select("Item da NBS", /item da nbs correspondente/, settings.nbs);
-    await select("Código indicador da operação", /codigo indicador da operacao/, settings.operation);
-    await update("done", "Serviço preenchido. Complete a descrição e revise a nota.");
+    await attempt(() => applyRadio(issqn, "Imunidade, exportação ou não incidência do ISSQN", "Não"));
+    if (issues.length) throw new Error(issues.join(" · "));
+    await attempt(() => select("Item da NBS", "ServicoPrestado_CodigoNBS", "120012000"));
+    await attempt(() => select("Código indicador da operação", "ServicoPrestado_CodigoIndOp", "050101"));
+    if (issues.length) throw new Error(issues.join(" · "));
+    await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.");
   }
 
   function report(error) {
@@ -305,7 +372,7 @@
     running = true;
     try {
       const flow = await chrome.runtime.sendMessage({ type: "nfse:claim" });
-      if (flow?.service) await fillService(flow.service);
+      if (flow) await fillService();
     } catch (error) {
       await report(error);
     } finally {
@@ -314,6 +381,16 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _, respond) => {
+    if (message.type === "nfse:start-service") {
+      if (running || !servicePath.test(location.pathname)) {
+        respond({ ok: false });
+        return;
+      }
+      running = true;
+      respond({ ok: true });
+      fillService().catch(report).finally(() => { running = false; }).catch(() => {});
+      return;
+    }
     if (message.type !== "nfse:start") return;
     if (running || !peoplePath.test(location.pathname) || !/^\d{14}$/.test(message.cnpj)) {
       respond({ ok: false });

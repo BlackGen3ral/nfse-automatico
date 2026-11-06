@@ -17,10 +17,12 @@
       <li id="people"><span>1</span>Pessoas</li><li id="service"><span>2</span>Serviço</li>
     </ol>
     <form id="fill-form">
-      <label for="cnpj">CNPJ do tomador</label>
-      <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
-      <p id="hint">O mesmo CNPJ será usado para o destinatário quando o portal pedir esse campo.</p>
-      <button id="fill" disabled type="submit">Preencher <span aria-hidden="true">→</span></button>
+      <div id="people-fields">
+        <label for="cnpj">CNPJ do tomador</label>
+        <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
+        <p id="hint">O mesmo CNPJ será usado para o destinatário quando o portal pedir esse campo.</p>
+      </div>
+      <button id="fill" disabled type="submit"><span id="fill-label">Preencher</span> <span aria-hidden="true">→</span></button>
     </form>
     <p id="status" role="status" aria-live="polite"></p>
     <footer><span>Emissão após revisão</span><a href="https://github.com/BlackGen3ral/nfse-automatico#atualiza%C3%A7%C3%B5es-pelo-github" target="_blank" rel="noreferrer">Atualizações ↗</a></footer>
