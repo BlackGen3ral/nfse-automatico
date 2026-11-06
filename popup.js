@@ -169,6 +169,10 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     if (valuesUrl.test(tab.url)) message = { type: "nfse:start-values" };
     const reply = await chrome.tabs.sendMessage(tab.id, message);
     if (!reply?.ok) throw new Error();
+    if (message.type === "nfse:start") {
+      window.close();
+      return;
+    }
     starting = false;
     await refresh();
   } catch {
