@@ -16,10 +16,10 @@ O campo **Descrição do Serviço/Fornecimento** fica em branco por não haver t
 
 ## Instalação local
 
-1. Extraia `NFS-e-Automatico-0.1.0.zip`.
+1. No repositório, abra **Code > Download ZIP** e extraia o arquivo.
 2. Abra `chrome://extensions` no Chrome ou `edge://extensions` no Edge.
 3. Ative **Modo do desenvolvedor** e escolha **Carregar sem compactação**.
-4. Selecione a pasta extraída `NFSe-Automatico`.
+4. Selecione a pasta extraída `nfse-automatico-main`.
 5. Abra a extensão e cadastre cada emitente, o CNPJ do tomador e, se diferente, o CNPJ do destinatário.
 6. Atualize a tela do Emissor Nacional para aplicar o perfil.
 
@@ -34,3 +34,4 @@ O mapeamento dos campos Pessoas foi conferido na interface real do portal na ver
 ## Repositório
 
 Código-fonte: https://github.com/BlackGen3ral/nfse-automatico. O repositório contém apenas a extensão e esta documentação; os perfis empresariais são criados no navegador e não fazem parte do código.
+
