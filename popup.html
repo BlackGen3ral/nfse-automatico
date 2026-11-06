@@ -18,7 +18,7 @@
     </ol>
     <form id="fill-form">
       <div id="people-fields">
-        <div class="form-intro"><div><p class="section-tag">NOVA NFS-E</p><h2>Dados da nota</h2></div><span class="field-total">3 campos</span></div>
+        <div class="form-intro"><div><p class="section-tag">NOVA NFS-E</p><h2>Dados da nota</h2></div><span class="field-total">4 campos</span></div>
         <label for="cnpj">CNPJ do tomador</label>
         <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
         <p id="hint">O mesmo CNPJ será usado para o destinatário quando o portal pedir esse campo.</p>
@@ -27,6 +27,13 @@
         <label for="amount">Valor do serviço</label>
         <div class="amount-field"><span aria-hidden="true">R$</span><input id="amount" name="amount" inputmode="decimal" maxlength="20" placeholder="0,00" autocomplete="off" required aria-describedby="amount-hint"></div>
         <p id="amount-hint">Use o formato 1.234,56.</p>
+        <fieldset class="tax-choice">
+          <legend>Exigibilidade do ISSQN suspensa?</legend>
+          <div class="choice-buttons">
+            <label><input type="radio" name="issqn-suspended" value="no" checked><span>Não <small>Padrão</small></span></label>
+            <label><input type="radio" name="issqn-suspended" value="yes"><span>Sim</span></label>
+          </div>
+        </fieldset>
       </div>
       <button id="fill" disabled type="submit"><span id="fill-label">Preencher</span><span class="arrow" aria-hidden="true">→</span></button>
     </form>

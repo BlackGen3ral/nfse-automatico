@@ -127,21 +127,25 @@ try {
     $last = [DateTimeOffset]::MinValue
     [void][DateTimeOffset]::TryParse($checkedAt, [ref]$last)
     $minutes = if ($status.state -eq 'error') { 5 } else { 60 }
-    if (!$pending -and ($CheckNow -or [DateTimeOffset]::UtcNow -ge $last.AddMinutes($minutes))) {
+    $checked = $CheckNow -or [DateTimeOffset]::UtcNow -ge $last.AddMinutes($minutes)
+    if ($checked) {
         $checkedAt = [DateTimeOffset]::UtcNow.ToString('o')
-        $download = Get-Update $current
+        $baseline = if ($pending) { [version]$pending.version } else { $current }
+        $download = $null
+        try { $download = Get-Update $baseline }
+        catch { if (!$pending) { throw } }
         if ($download) {
             Write-Json $pendingPath $download
             $pending = Read-Json $pendingPath
         }
-        else { Write-Status 'current' $local.version $checkedAt }
+        elseif (!$pending) { Write-Status 'current' $local.version $checkedAt }
     }
     if ($pending) {
         if (Install-Update $pending) {
             Remove-Item -LiteralPath $pendingPath
             Write-Status 'current' $pending.version $checkedAt
         }
-        elseif ($status.state -ne 'waiting-close' -or $status.version -ne $pending.version) {
+        elseif ($checked -or $status.state -ne 'waiting-close' -or $status.version -ne $pending.version) {
             Write-Status 'waiting-close' $pending.version $checkedAt
         }
     }

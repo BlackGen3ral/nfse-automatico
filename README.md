@@ -4,6 +4,8 @@ Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacion
 
 O fluxo pesquisa os CNPJs em **Pessoas**, aplica a configuração tributária e a descrição em **Serviço**, informa o valor e os códigos combinados em **Valores** e avança para a **Revisão**. Você confere os dados e confirma a emissão no portal.
 
+No painel inicial, **Exigibilidade do ISSQN suspensa?** começa em **Não** para cada nota. Se marcar **Sim**, a extensão leva a escolha para **Valores** e indica quando o portal exigir dados adicionais para continuar. Essa opção é separada da retenção do ISSQN.
+
 Em um rascunho aberto diretamente em **Serviço** ou **Valores**, os botões dessas etapas aplicam os respectivos padrões. Se o fluxo iniciado em Pessoas tiver parado nesse rascunho, o botão da etapa retoma a descrição e o valor informados no painel.
 
 O andamento aparece na página do portal. Se algum campo ou pesquisa não puder ser confirmado, a extensão indica o que ficou pendente. A descrição e o valor são repassados entre etapas pelo armazenamento de sessão do navegador.

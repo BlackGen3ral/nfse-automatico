@@ -230,7 +230,8 @@
   function validInvoice(invoice) {
     return typeof invoice?.description === "string" && !!invoice.description.trim() &&
       invoice.description.length <= 2000 && typeof invoice.amount === "string" &&
-      /^\d{1,20},\d{2}$/.test(invoice.amount) && /[1-9]/.test(invoice.amount);
+      /^\d{1,20},\d{2}$/.test(invoice.amount) && /[1-9]/.test(invoice.amount) &&
+      (invoice.issqnSuspended === undefined || typeof invoice.issqnSuspended === "boolean");
   }
 
   function advanceButton(fieldId, stagePath, stageName) {
@@ -416,11 +417,11 @@
     watchAdvance(servicePath, next, "Serviço", invoice);
   }
 
-  function issqnRetentionNo() {
+  function selectIssqnAnswer(questionStart, answer) {
     const scope = document.getElementById("pnlOperacaoTributavel");
     if (!visible(scope)) return false;
     const question = Array.from(scope.querySelectorAll("label,legend,p,span,div")).find((item) =>
-      norm(item.textContent).startsWith("ha retencao do issqn pelo tomador ou pelo intermediario") &&
+      norm(item.textContent).startsWith(questionStart) &&
       !item.querySelector("input,select,textarea"));
     if (!question) return false;
     const following = Array.from(scope.querySelectorAll("input[type=radio],hr")).filter((item) =>
@@ -428,7 +429,8 @@
     const [first, second] = following;
     if (!first?.name || first.name !== second?.name ||
         !first.matches("input[type=radio]") || !second.matches("input[type=radio]")) return false;
-    return chooseRadio(scope, "Não", first.name);
+    if (!findRadio(scope, "Não", first.name) || !findRadio(scope, "Sim", first.name)) return false;
+    return chooseRadio(scope, answer, first.name);
   }
 
   async function fillValues(invoice = null) {
@@ -446,7 +448,11 @@
       const formatted = invoice.amount.replace(/\B(?=(\d{3})+,)/g, ".");
       return setNativeValue(field, formatted) && field.value.replace(/\./g, "").trim() === invoice.amount;
     }));
-    await attempt(() => waitFor("Retenção do ISSQN", issqnRetentionNo));
+    const suspension = invoice?.issqnSuspended === true ? "Sim" : "Não";
+    await attempt(() => waitFor("Suspensão da exigibilidade do ISSQN", () => selectIssqnAnswer(
+      "a exigibilidade do recolhimento do issqn devido nesta operacao esta suspensa", suspension)));
+    await attempt(() => waitFor("Retenção do ISSQN", () => selectIssqnAnswer(
+      "ha retencao do issqn pelo tomador ou pelo intermediario", "Não")));
     const pisReady = await attempt(() => select("Situação Tributária do PIS/COFINS",
       "TributacaoFederal_PISCofins_SituacaoTributaria", "00"));
     if (pisReady) await attempt(() => select("Tipo de retenção do PIS/COFINS/CSLL",
@@ -468,6 +474,15 @@
     if (!invoice) {
       await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
       return;
+    }
+    if (invoice.issqnSuspended) {
+      const scope = document.getElementById("pnlOperacaoTributavel");
+      const required = scope?.querySelectorAll("input[required], input[data-val-required], select[required], select[data-val-required]") || [];
+      const missing = Array.from(required).some((field) => {
+        const shown = visible(field) || visible(document.getElementById(field.id + "_chosen"));
+        return shown && !field.disabled && !field.matches("[type=radio],[type=checkbox],[type=hidden]") && !field.value.trim();
+      });
+      if (missing) throw new Error("Preencha os dados da suspensão da exigibilidade do ISSQN");
     }
     const next = advanceButton("Valores_ValorServico", valuesPath, "Valores");
     const armed = await update("review", "Preenchimento concluído. Revise a nota e decida quando emitir.");

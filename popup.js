@@ -1,6 +1,7 @@
 const input = document.querySelector("#cnpj");
 const description = document.querySelector("#description");
 const amount = document.querySelector("#amount");
+const suspensionChoices = Array.from(document.querySelectorAll("[name=issqn-suspended]"));
 const button = document.querySelector("#fill");
 const status = document.querySelector("#status");
 const peopleUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Pessoas(?:[/?#]|$)/i;
@@ -45,7 +46,8 @@ function serviceAmount() {
 function invoiceData() {
   const text = description.value.trim();
   const value = serviceAmount();
-  return text && value ? { description: text, amount: value } : null;
+  const issqnSuspended = suspensionChoices.some((choice) => choice.checked && choice.value === "yes");
+  return text && value ? { description: text, amount: value, issqnSuspended } : null;
 }
 
 function renderButton() {
@@ -55,7 +57,7 @@ function renderButton() {
   const withoutCnpj = inService || inValues;
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
-  for (const field of [input, description, amount]) field.disabled = withoutCnpj;
+  for (const field of [input, description, amount, ...suspensionChoices]) field.disabled = withoutCnpj;
   button.disabled = busy || starting ||
     (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14 || !invoiceData()));
 }
@@ -123,6 +125,7 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     const reply = await chrome.tabs.sendMessage(tab.id, message);
     if (!reply?.ok) throw new Error();
     for (const field of [input, description, amount]) field.value = "";
+    suspensionChoices[0].checked = true;
     starting = false;
     await refresh();
   } catch {
