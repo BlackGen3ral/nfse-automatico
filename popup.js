@@ -22,7 +22,6 @@ async function closePanel() {
     show("Use o X da lateral do Chrome para fechar o painel.", true);
   }
 }
-document.getElementById("close-panel").addEventListener("click", closePanel);
 async function targetTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   return active;
