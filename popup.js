@@ -65,6 +65,7 @@ function invoiceData() {
 }
 
 function renderButton() {
+  button.setAttribute("aria-busy", String(busy || starting));
   document.querySelector("#count").textContent = description.value.length + "/2000";
   const inService = serviceUrl.test(tab?.url || "");
   const inValues = valuesUrl.test(tab?.url || "");

@@ -81,3 +81,54 @@ a { color: #08684e; font-weight: 700; }
 @media(max-width:420px){.hero{grid-template-columns:36px minmax(0,1fr) auto;gap:7px;padding:12px}.hero img{width:36px;height:36px}.version{font-size:9px;padding:3px 5px}h1{font-size:19px}.subtitle{font-size:10px}.invoice-details{grid-template-columns:1fr;gap:12px}main{padding:10px}.action-dock{padding:11px 12px}.form-intro{margin-bottom:8px}}
 
 input:focus,textarea:focus{background:#fff;border-color:#348c63}input,textarea{transition:border-color .15s,background .15s}@media(prefers-reduced-motion:reduce){input,textarea{transition:none}}
+
+/* As animações só aparecem quando a ação está disponível ou em execução. */
+#fill {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  transition: box-shadow .2s ease, background .2s ease;
+}
+#fill > span { position: relative; z-index: 1; }
+#fill-label { text-align: left; }
+#fill::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, #c8ffe91c 43%, #ffffff38 50%, #c8ffe91c 57%, transparent 70%);
+  transform: translateX(-110%);
+}
+#fill:not(:disabled)::before { animation: fill-sheen 5.8s ease-in-out infinite; }
+#fill .arrow { flex: 0 0 30px; margin-left: 10px; }
+#fill .arrow > span { display: block; }
+#fill:not(:disabled) .arrow > span { animation: fill-arrow 3.2s ease-in-out infinite; }
+#fill:hover:not(:disabled), #fill:focus-visible:not(:disabled) { box-shadow: 0 5px 15px #0b5c3438; }
+#fill[aria-busy="true"] { color: #fff; background: #086549; cursor: progress; }
+#fill[aria-busy="true"]::before { animation: fill-sheen 1.6s ease-in-out infinite; }
+#fill[aria-busy="true"] .arrow > span { visibility: hidden; animation: none; }
+#fill[aria-busy="true"] .arrow::after {
+  content: "";
+  position: absolute;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff40;
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: fill-spin .8s linear infinite;
+}
+@keyframes fill-sheen {
+  0%, 55% { transform: translateX(-110%); }
+  85%, 100% { transform: translateX(110%); }
+}
+@keyframes fill-arrow {
+  0%, 65%, 100% { transform: translateX(0); }
+  76% { transform: translateX(3px); }
+  87% { transform: translateX(-1px); }
+}
+@keyframes fill-spin { to { transform: rotate(360deg); } }
+@media (prefers-reduced-motion: reduce) {
+  #fill { transition: none; }
+  #fill::before, #fill:not(:disabled)::before, #fill[aria-busy="true"]::before { animation: none; opacity: 0; }
+  #fill:not(:disabled) .arrow > span, #fill[aria-busy="true"] .arrow::after { animation: none; }
+}
