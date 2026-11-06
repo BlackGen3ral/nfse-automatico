@@ -1,9 +1,9 @@
 (() => {
   const DIGITS = (value) => (value || "").replace(/\D/g, "");
   const norm = (value) => (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
-  const searched = new WeakMap();
-  let timer;
-  let lastSignature = "";
+  let running = false;
+  const peoplePath = /\/DPS\/Pessoas(?:\/|$)/i;
+  const servicePath = /\/DPS\/Servi(?:c|ç|%c3%a7)o(?:\/|$)/i;
 
   function cnpjInEmitterHeader() {
     const text = Array.from(document.querySelectorAll("body *"))
@@ -35,7 +35,7 @@
       if (!labelPattern.test(text)) continue;
       const direct = label.htmlFor ? document.getElementById(label.htmlFor) : label.querySelector("input,select,textarea,[role=combobox]");
       const candidates = [direct, formGroup(label)?.querySelector("input,select,textarea,[role=combobox]")].filter(Boolean);
-      const usable = candidates.find((item) => !item.matches("input[type=radio],input[type=checkbox]") && !item.disabled);
+      const usable = candidates.find((item) => !item.matches("input[type=radio],input[type=checkbox],input[type=hidden]"));
       if (usable) return usable;
     }
     return null;
@@ -55,37 +55,35 @@
   }
 
   function selectOption(element, wanted, firstValid = false) {
-    if (!element) return false;
-    if (element instanceof HTMLSelectElement) {
-      const options = Array.from(element.options).filter((option) => !option.disabled && option.value && !/selecione|selecione\.\.\./i.test(norm(option.textContent)));
-      let option;
-      if (firstValid) option = options[0];
-      else {
-        const target = norm(wanted).replace(/\s/g, "");
-        option = options.find((item) => norm(item.value).replace(/\s/g, "") === target || norm(item.textContent).replace(/\s/g, "").includes(target));
-      }
-      if (!option) return false;
-      if (element.value === option.value) return true;
-      element.value = option.value;
-      element.dispatchEvent(new Event("input", { bubbles: true }));
-      element.dispatchEvent(new Event("change", { bubbles: true }));
-      return true;
-    }
-    const chosen = element.closest(".chosen-container") || (element.matches("[role=combobox]") ? element : null);
-    if (!chosen) return false;
-    chosen.click();
-    const search = chosen.querySelector("input.chosen-search-input,input");
-    if (search && !firstValid) {
-      setNativeValue(search, wanted);
-      search.dispatchEvent(new KeyboardEvent("keyup", { bubbles: true, key: "p" }));
-    }
-    requestAnimationFrame(() => {
-      const results = Array.from(document.querySelectorAll(".chosen-results .active-result,[role=option]"));
-      const target = norm(wanted).replace(/\s/g, "");
-      const option = firstValid ? results.find(visible) : results.find((item) => visible(item) && norm(item.textContent).replace(/\s/g, "").includes(target));
-      option?.click();
+    if (!(element instanceof HTMLSelectElement)) return false;
+    const options = Array.from(element.options).filter((option) =>
+      !option.matches(":disabled") && option.value && !/^selecione\b/.test(norm(option.textContent)));
+    const target = norm(wanted).replace(/\s/g, "");
+    const option = firstValid ? options[0] : options.find((item) => {
+      const text = norm(item.textContent);
+      const label = text.replace(/\s/g, "");
+      return norm(item.value).replace(/\s/g, "") === target ||
+        (target && (/^\d+$/.test(target)
+          ? label.startsWith(target) && !/\d/.test(label[target.length] || "")
+          : text.replace(/^\d+ /, "") === norm(wanted) || text.startsWith(norm(wanted) + " ")));
     });
-    return true;
+    if (!option) return false;
+    if (element.value === option.value) return true;
+    if (element.disabled) return false;
+    const chosen = document.getElementById(element.id + "_chosen");
+    if (visible(chosen)) {
+      const opener = chosen.querySelector(".chosen-single");
+      if (!opener) return false;
+      if (!chosen.classList.contains("chosen-with-drop")) {
+        opener.dispatchEvent(new MouseEvent("mousedown", { bubbles: true, button: 0 }));
+      }
+      const result = Array.from(chosen.querySelectorAll(".chosen-results .active-result"))
+        .find((item) => norm(item.textContent) === norm(option.textContent));
+      if (!result) return false;
+      result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
+      return element.value === option.value;
+    }
+    return setNativeValue(element, option.value) && element.value === option.value;
   }
 
   function findRadio(scope, optionText) {
@@ -106,10 +104,9 @@
 
   function chooseRadio(scope, optionText) {
     const radio = findRadio(scope, optionText);
-    if (!radio || radio.checked) return !!radio;
-    radio.click();
-    radio.dispatchEvent(new Event("change", { bubbles: true }));
-    return true;
+    if (!radio || radio.disabled) return !!radio?.checked;
+    if (!radio.checked) radio.click();
+    return radio.checked;
   }
 
   function findCnpjInput(panel, stem) {
@@ -117,122 +114,183 @@
       findControl(panel, /^(cpf cnpj|cnpj)$/);
   }
 
-  function triggerSearch(panel, input, buttonId) {
-    if (!input || !input.value || searched.get(input) === input.value) return;
-    const button = document.getElementById(buttonId) || input.closest(".input-group")?.querySelector("button:not([disabled]),button");
-    if (button && !button.disabled) {
-      button.click();
-      searched.set(input, input.value);
+  const defaults = {
+    municipality: "Pimenta Bueno/RO", taxCode: "140201", nbs: "120012000", operation: "050101",
+    issqnImune: false, governmentPurchase: false, recipientIsAcquirer: false,
+    customerLocation: "Brasil", recipientLocation: "Brasil", intermediary: "Intermediário não informado"
+  };
+
+  async function preferences() {
+    const { nfseConfig } = await chrome.storage.local.get("nfseConfig");
+    const issuer = cnpjInEmitterHeader();
+    const profile = issuer && nfseConfig?.companies?.find((item) => DIGITS(item.issuerCnpj) === issuer);
+    return { ...defaults, ...nfseConfig?.defaults, ...profile?.overrides };
+  }
+
+  function update(phase, text, extra = {}) {
+    return chrome.runtime.sendMessage({
+      type: "nfse:update",
+      state: { phase, text, until: Date.now() + (phase === "waiting" ? 25000 : 120000), ...extra }
+    });
+  }
+
+  async function waitFor(label, predicate, timeout = 7500) {
+    const deadline = Date.now() + timeout;
+    do {
+      const result = predicate();
+      if (result) return result;
+      await new Promise((resolve) => setTimeout(resolve, 140));
+    } while (Date.now() < deadline);
+    throw new Error(label);
+  }
+
+  function panel(id) {
+    const element = document.getElementById(id);
+    return visible(element) ? element : null;
+  }
+
+  function applyRadio(scope, label, option) {
+    return waitFor(label, () => chooseRadio(scope(), option));
+  }
+
+  function dateValue(field) {
+    const today = new Date();
+    const year = today.getFullYear();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return field.type === "date" ? [year, month, day].join("-") : [day, month, year].join("/");
+  }
+
+  function lookupName(scope, stem) {
+    const field = scope?.querySelector("#" + stem + "_Nome, [name='" + stem + ".Nome']") ||
+      findControl(scope, /^(?:nome(?: (?:ou )?razao social)?|razao social)$/);
+    return (field?.value || field?.textContent || "").trim();
+  }
+
+  async function lookup(scope, stem, label, cnpj) {
+    const field = () => findCnpjInput(scope(), stem);
+    const input = await waitFor(label + " · campo de CNPJ", () => visible(field()) && field());
+    const previousCnpj = DIGITS(input.value);
+    const previousName = lookupName(scope(), stem);
+    const formatted = cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+    if (!setNativeValue(input, formatted) || DIGITS(input.value) !== cnpj) throw new Error(label + " · CNPJ");
+    const button = await waitFor(label + " · botão de pesquisa", () => {
+      const candidate = scope()?.querySelector("#btn_" + stem + "_Inscricao_pesquisar") ||
+        field()?.closest(".input-group")?.querySelector("button[id$='_pesquisar']");
+      return visible(candidate) && !candidate.disabled && candidate;
+    });
+    let nameWasCleared = !previousName || !lookupName(scope(), stem);
+    button.click();
+    await waitFor(label + " · resultado da pesquisa", () => {
+      const name = lookupName(scope(), stem);
+      if (!name) nameWasCleared = true;
+      return DIGITS(field()?.value) === cnpj && name &&
+        (previousCnpj === cnpj || nameWasCleared || name !== previousName);
+    }, 12000);
+  }
+
+  async function fillPeople(cnpj) {
+    const settings = await preferences();
+    const scope = document.querySelector("main, #main-content") || document;
+    await waitFor("Data de competência", () => {
+      const field = findControl(scope, /^data de competencia/);
+      return visible(field) && setNativeValue(field, dateValue(field)) && field.value === dateValue(field);
+    });
+    const regime = () => findControl(scope, /regime de apuracao/);
+    if (regime()) await waitFor("Regime de apuração", () => selectOption(regime(), settings.regime, !settings.regime || settings.regime === "first-valid"));
+    const government = () => panel("pnlComprasGov");
+    if (government()) await applyRadio(government, "Compra governamental", settings.governmentPurchase ? "Sim" : "Não");
+
+    const customer = () => panel("pnlTomador");
+    await applyRadio(customer, "Localização do tomador", settings.customerLocation);
+    if (settings.customerLocation === "Brasil") await lookup(customer, "Tomador", "Tomador", cnpj);
+    const destination = () => panel("pnlDestinatario");
+    await applyRadio(destination, "Destinatário é o próprio adquirente", settings.recipientIsAcquirer ? "Sim" : "Não");
+    if (!settings.recipientIsAcquirer) {
+      await applyRadio(destination, "Localização do destinatário", settings.recipientLocation);
+      if (settings.recipientLocation === "Brasil") await lookup(destination, "Destinatario", "Destinatário", cnpj);
+    }
+    await applyRadio(() => panel("pnlIntermediario"), "Intermediário", settings.intermediary);
+
+    const next = document.getElementById("btnAvancar");
+    const form = next?.form || next?.closest("form");
+    if (!peoplePath.test(location.pathname) || !visible(next) || next.disabled || !form) throw new Error("Botão Avançar");
+    if (!form.checkValidity() || form.querySelector("input.input-validation-error, select.input-validation-error, textarea.input-validation-error")) {
+      throw new Error("Campos obrigatórios da etapa Pessoas");
+    }
+
+    const { municipality, taxCode, nbs, operation, issqnImune } = settings;
+    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…", {
+      service: { municipality, taxCode, nbs, operation, issqnImune }
+    });
+    if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
+    next.click();
+    setTimeout(() => {
+      if (peoplePath.test(location.pathname)) {
+        update("error", "O portal permaneceu em Pessoas. Confira os avisos da página antes de avançar.").catch(() => {});
+      }
+    }, 25000);
+  }
+
+  async function fillService(settings) {
+    const scope = document.querySelector("main, #main-content") || document;
+    const select = (label, pattern, value) => waitFor(label, () => selectOption(findControl(scope, pattern), value));
+    await select("País", /^pais$/, "Brasil");
+    await select("Município", /^municipio$/, settings.municipality);
+    await select("Código de Tributação Nacional", /codigo de tributacao nacional/, settings.taxCode);
+    const issqn = () => {
+      const label = Array.from(scope.querySelectorAll("label,legend,p,span")).find((element) =>
+        norm(element.textContent).includes("o servico fornecimento prestado e um caso de imunidade"));
+      if (!label) return null;
+      for (let item = label.parentElement; item && item !== scope; item = item.parentElement) {
+        if (findRadio(item, "Sim") && findRadio(item, "Não")) return item;
+      }
+      return null;
+    };
+    await applyRadio(issqn, "Imunidade, exportação ou não incidência do ISSQN", settings.issqnImune ? "Sim" : "Não");
+    await select("Item da NBS", /item da nbs correspondente/, settings.nbs);
+    await select("Código indicador da operação", /codigo indicador da operacao/, settings.operation);
+    await update("done", "Serviço preenchido. Complete a descrição e revise a nota.");
+  }
+
+  function report(error) {
+    return update("error", "Confira este campo no portal: " + error.message + ".");
+  }
+
+  async function resume() {
+    if (running || !servicePath.test(location.pathname)) return;
+    running = true;
+    try {
+      const flow = await chrome.runtime.sendMessage({ type: "nfse:claim" });
+      if (flow?.service) await fillService(flow.service);
+    } catch (error) {
+      await report(error);
+    } finally {
+      running = false;
     }
   }
 
-  function fillParty(panel, stem, cnpj, buttonId) {
-    if (!panel || !visible(panel) || !cnpj || cnpj.length !== 14) return;
-    const input = findCnpjInput(panel, stem);
-    if (!input) return;
-    setNativeValue(input, cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5"));
-    triggerSearch(panel, input, buttonId);
-  }
-
-  function fillDate() {
-    const field = findControl(document, /data de competencia/);
-    if (!field) return;
-    const now = new Date();
-    const value = field.type === "date"
-      ? `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`
-      : `${String(now.getDate()).padStart(2, "0")}/${String(now.getMonth() + 1).padStart(2, "0")}/${now.getFullYear()}`;
-    setNativeValue(field, value);
-  }
-
-  function findPortalSection(id, headingText) {
-    const byId = document.getElementById(id);
-    if (byId) return byId;
-    const heading = Array.from(document.querySelectorAll("h1,h2,h3,h4,legend"))
-      .find((item) => norm(item.textContent).includes(norm(headingText)));
-    return heading?.parentElement || null;
-  }
-
-  function fillPeople(config, company) {
-    const overrides = company?.overrides || {};
-    const governmentPurchase = Object.hasOwn(overrides, "governmentPurchase") ? overrides.governmentPurchase : config.defaults.governmentPurchase;
-    const recipientIsAcquirer = Object.hasOwn(overrides, "recipientIsAcquirer") ? overrides.recipientIsAcquirer : config.defaults.recipientIsAcquirer;
-    const customerLocation = overrides.customerLocation || "Brasil";
-    const recipientLocation = overrides.recipientLocation || config.defaults.recipientCountry || "Brasil";
-    const government = document.getElementById("pnlComprasGov") || findPortalSection("", "Compras governamentais");
-    chooseRadio(government, governmentPurchase ? "Sim" : "Não");
-    const customer = document.getElementById("pnlTomador") || findPortalSection("", "Tomador/adquirente do serviço");
-    chooseRadio(customer, customerLocation);
-    if (customerLocation === "Brasil") fillParty(customer, "Tomador", company?.customerCnpj || "", "btn_Tomador_Inscricao_pesquisar");
-
-    const destination = document.getElementById("pnlDestinatario") || findPortalSection("", "Destinatário do serviço");
-    chooseRadio(destination, recipientIsAcquirer ? "Sim" : "Não");
-    const destinationCnpj = company?.recipientCnpj || company?.customerCnpj || "";
-    if (!recipientIsAcquirer) {
-      chooseRadio(destination, recipientLocation);
-      if (recipientLocation === "Brasil") fillParty(destination, "Destinatario", destinationCnpj, "btn_Destinatario_Inscricao_pesquisar");
+  chrome.runtime.onMessage.addListener((message, _, respond) => {
+    if (message.type !== "nfse:start") return;
+    if (running || !peoplePath.test(location.pathname) || !/^\d{14}$/.test(message.cnpj)) {
+      respond({ ok: false });
+      return;
     }
-
-    const intermediary = document.getElementById("pnlIntermediario") || findPortalSection("", "Intermediário do serviço");
-    chooseRadio(intermediary, overrides.intermediary || config.defaults.intermediary || "Intermediário não informado");
-
-    const regimeField = findControl(document, /regime de apuracao dos tributos no simples nacional/);
-    if (regimeField) {
-      const override = company?.overrides?.regime;
-      selectOption(regimeField, override || "", !override);
-    }
-  }
-
-  function fillService(config, company) {
-    const municipality = company?.overrides?.municipality || config.defaults.municipality;
-    const taxCode = company?.overrides?.taxCode || config.defaults.taxCode;
-    const nbs = company?.overrides?.nbs || config.defaults.nbs;
-    const operation = company?.overrides?.operation || config.defaults.operation;
-    const issqnImune = Object.hasOwn(company?.overrides || {}, "issqnImune") ? company.overrides.issqnImune : config.defaults.issqnImune;
-    const countryField = findControl(document, /^pais$/);
-    if (countryField) selectOption(countryField, "Brasil");
-    const cityField = findControl(document, /^municipio$/);
-    if (cityField) selectOption(cityField, municipality);
-    const taxField = findControl(document, /codigo de tributacao nacional/);
-    if (taxField) selectOption(taxField, taxCode);
-    const issqnGroup = Array.from(document.querySelectorAll("body *"))
-      .find((element) => element.children.length === 0 && norm(element.textContent).includes("o servico fornecimento prestado e um caso de imunidade"));
-    const issqnScope = issqnGroup ? formGroup(issqnGroup) || issqnGroup.parentElement : document;
-    chooseRadio(issqnScope, issqnImune ? "Sim" : "Não");
-    const nbsField = findControl(document, /item da nbs correspondente/);
-    if (nbsField) selectOption(nbsField, nbs);
-    const operationField = findControl(document, /codigo indicador da operacao/);
-    if (operationField) selectOption(operationField, operation);
-  }
-
-  async function apply() {
-    const stored = await chrome.storage.local.get("nfseConfig");
-    const config = stored.nfseConfig;
-    if (!config?.defaults) return;
-    const cnpj = cnpjInEmitterHeader();
-    let company = config.companies.find((item) => DIGITS(item.issuerCnpj) === cnpj);
-    if (!company && !cnpj && config.companies.length === 1) company = config.companies[0];
-    const signature = `${location.pathname}:${cnpj || (company ? "single" : "none")}`;
-    if (signature !== lastSignature) lastSignature = signature;
-
-    if (/\/DPS\/Pessoas/i.test(location.pathname)) {
-      fillDate();
-      fillPeople(config, company);
-    }
-    if (/\/DPS\/Servico/i.test(location.pathname)) fillService(config, company);
-  }
-
-  function scheduleApply() {
-    clearTimeout(timer);
-    timer = setTimeout(() => apply().catch(() => {}), 350);
-  }
-
-  chrome.storage.onChanged.addListener((changes, area) => {
-    if (area === "local" && changes.nfseConfig) scheduleApply();
+    running = true;
+    (async () => {
+      const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
+      if (!state) throw new Error("Início do preenchimento");
+      respond({ ok: true });
+      await fillPeople(message.cnpj);
+    })().catch(async (error) => {
+      respond({ ok: false });
+      await report(error);
+    }).finally(() => {
+      running = false;
+      resume().catch(() => {});
+    }).catch(() => {});
+    return true;
   });
-  new MutationObserver(scheduleApply).observe(document.documentElement, { childList: true, subtree: true });
-  window.addEventListener("pageshow", scheduleApply);
-  window.addEventListener("popstate", scheduleApply);
-  window.addEventListener("hashchange", scheduleApply);
-  scheduleApply();
+  window.addEventListener("pageshow", () => resume().catch(() => {}));
+  resume().catch(() => {});
 })();
-

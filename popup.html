@@ -2,98 +2,29 @@
 <html lang="pt-BR">
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>NFS-e Automático</title>
   <link rel="stylesheet" href="popup.css">
 </head>
 <body>
   <header>
-    <div class="eyebrow">EMISSOR NACIONAL</div>
-    <h1>NFS-e Automático</h1>
-    <p>Perfis guardados somente neste navegador.</p>
+    <img src="icons/icon-48.png" alt="" width="44" height="44">
+    <div><p class="eyebrow">EMISSOR NACIONAL</p><h1>NFS-e Automático</h1></div>
+    <span id="version" class="version"></span>
   </header>
-
   <main>
-    <section class="panel">
-      <div class="section-heading">
-        <div>
-          <h2>Minhas empresas</h2>
-          <p>O perfil é escolhido pelo CNPJ do emitente que aparece no portal.</p>
-        </div>
-      </div>
-      <ul id="companies" class="companies" aria-live="polite"></ul>
-      <button id="newCompany" class="button secondary" type="button">Adicionar empresa</button>
-    </section>
-
-    <section id="editor" class="panel" hidden>
-      <h2 id="editorTitle">Nova empresa</h2>
-      <form id="companyForm">
-        <input id="editingId" type="hidden">
-        <label>Nome para identificar a empresa
-          <input id="companyName" maxlength="80" autocomplete="off" placeholder="Ex.: Matriz" required>
-        </label>
-        <label>CNPJ do emitente no portal
-          <input id="issuerCnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required>
-        </label>
-        <label>CNPJ do tomador/adquirente
-          <input id="customerCnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Pode ser igual ao do destinatário">
-        </label>
-        <label>CNPJ do destinatário
-          <input id="recipientCnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Deixe vazio para usar o do tomador">
-        </label>
-
-        <details>
-          <summary>Exceções desta empresa</summary>
-          <p class="hint">Deixe em branco para herdar o padrão compartilhado.</p>
-          <label>Município
-            <input id="overrideMunicipality" autocomplete="off" placeholder="Pimenta Bueno/RO">
-          </label>
-          <label>Código de Tributação Nacional
-            <input id="overrideTaxCode" autocomplete="off" placeholder="140201">
-          </label>
-          <label>Item da NBS
-            <input id="overrideNbs" inputmode="numeric" autocomplete="off" placeholder="120012000">
-          </label>
-          <label>Código indicador da operação
-            <input id="overrideOperation" autocomplete="off" placeholder="050101">
-          </label>
-          <label>Imunidade, exportação ou não incidência do ISSQN
-            <select id="overrideIssqn"><option value="">Padrão: Não</option><option value="nao">Não</option><option value="sim">Sim</option></select>
-          </label>
-          <label>Compra governamental
-            <select id="overrideGovernment"><option value="">Padrão: Não</option><option value="nao">Não</option><option value="sim">Sim</option></select>
-          </label>
-          <label>Destinatário é o próprio adquirente?
-            <select id="overrideOwnRecipient"><option value="">Padrão: Não</option><option value="nao">Não</option><option value="sim">Sim</option></select>
-          </label>
-          <label>Localização do tomador
-            <select id="overrideCustomerLocation"><option value="">Padrão: Brasil</option><option value="Brasil">Brasil</option><option value="Exterior">Exterior</option><option value="Tomador/Adquirente não informado">Não informado</option></select>
-          </label>
-          <label>Localização do destinatário
-            <select id="overrideRecipientLocation"><option value="">Padrão: Brasil</option><option value="Brasil">Brasil</option><option value="Exterior">Exterior</option></select>
-          </label>
-          <label>Localização do intermediário
-            <select id="overrideIntermediary"><option value="">Padrão: Não informado</option><option value="Intermediário não informado">Não informado</option><option value="Brasil">Brasil</option><option value="Exterior">Exterior</option></select>
-          </label>
-          <label>Regime de apuração (texto da opção)
-            <input id="overrideRegime" autocomplete="off" placeholder="Vazio: primeira opção válida">
-          </label>
-        </details>
-
-        <div class="form-actions">
-          <button class="button primary" type="submit">Salvar empresa</button>
-          <button id="cancelEdit" class="button secondary" type="button">Cancelar</button>
-        </div>
-      </form>
-    </section>
-
-    <section class="privacy" aria-label="Privacidade">
-      <strong>Privacidade</strong>
-      <p>Os dados ficam em <code>chrome.storage.local</code> ou no armazenamento local equivalente do Edge. A extensão não envia cadastros para servidores, não usa sincronização e não acessa outras páginas. Desinstalar a extensão pode apagar esses dados.</p>
-    </section>
-    <div id="status" role="status" aria-live="polite"></div>
+    <ol aria-label="Etapas">
+      <li id="people"><span>1</span>Pessoas</li><li id="service"><span>2</span>Serviço</li>
+    </ol>
+    <form id="fill-form">
+      <label for="cnpj">CNPJ do tomador</label>
+      <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="Digite os 14 números" required aria-describedby="hint">
+      <p id="hint">O mesmo CNPJ será usado para o destinatário quando o portal pedir esse campo.</p>
+      <button id="fill" disabled type="submit">Preencher <span aria-hidden="true">→</span></button>
+    </form>
+    <p id="status" role="status" aria-live="polite"></p>
+    <footer><span>Emissão após revisão</span><a href="https://github.com/BlackGen3ral/nfse-automatico#atualiza%C3%A7%C3%B5es-pelo-github" target="_blank" rel="noreferrer">Atualizações ↗</a></footer>
   </main>
   <script src="popup.js"></script>
 </body>
 </html>
-

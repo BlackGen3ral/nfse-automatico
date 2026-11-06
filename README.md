@@ -1,37 +1,34 @@
-# NFS-e Automático
+﻿# NFS-e Automático
 
-Extensão Chrome/Edge Manifest V3 para preencher campos previamente configurados no Emissor Nacional da NFS-e. A versão 0.1.0 guarda perfis em armazenamento local do navegador e não contém integração de rede, Google Sync ou transmissão de cadastros.
+Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão, digite o **CNPJ do tomador** e clique em **Preencher**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
-## Padrões incluídos
+O fluxo pesquisa os CNPJs no portal, preenche Pessoas e, quando os campos e as pesquisas estiverem confirmados, aciona **Avançar**. Em **Serviço**, aplica Brasil, Pimenta Bueno/RO, tributação 140201, ISSQN Não, NBS 120012000 e operação 050101. Preencha a descrição, revise os dados e emita manualmente.
 
-- Data de competência: data de hoje.
-- Compra governamental: Não.
-- Tomador e destinatário localizados no Brasil; CNPJs vêm do perfil da empresa.
-- Destinatário é o próprio adquirente: Não.
-- Intermediário: Intermediário não informado.
-- Serviço: Município Pimenta Bueno/RO, código nacional 140201, ISSQN Não, NBS 120012000 e indicador 050101.
-- Regime de apuração: primeira opção habilitada que não seja um item vazio ou “Selecione”.
+A extensão lê as exceções da versão anterior quando o CNPJ do emitente corresponde a um perfil local. O CNPJ digitado no painel substitui os CNPJs cadastrados naquela execução. O número vai ao Emissor Nacional pela pesquisa do próprio portal. O atualizador consulta apenas os arquivos públicos do GitHub.
 
-O campo **Descrição do Serviço/Fornecimento** fica em branco por não haver texto fornecido. A extensão não avança etapas, não preenche valores nem clica em “Emitir NFS-e”. Revise os dados e conclua a emissão manualmente.
+## Instalação
 
-## Instalação local
+1. Baixe o ZIP e extraia para uma pasta fixa. Se você já instalou a versão anterior, copie os arquivos para a pasta que o navegador já usa.
+2. Abra `chrome://extensions` ou `edge://extensions`, ative o **Modo do desenvolvedor** e use **Carregar sem compactação**. Se já estava instalada na mesma pasta, clique em **Recarregar**.
+3. Abra ou atualize a etapa **Pessoas** no portal.
 
-1. No repositório, abra **Code > Download ZIP** e extraia o arquivo.
-2. Abra `chrome://extensions` no Chrome ou `edge://extensions` no Edge.
-3. Ative **Modo do desenvolvedor** e escolha **Carregar sem compactação**.
-4. Selecione a pasta extraída `nfse-automatico-main`.
-5. Abra a extensão e cadastre cada emitente, o CNPJ do tomador e, se diferente, o CNPJ do destinatário.
-6. Atualize a tela do Emissor Nacional para aplicar o perfil.
+## Atualizações pelo GitHub
 
-## Privacidade
+A atualização é opcional e funciona no Windows. No PowerShell, aberto na pasta da extensão, execute uma vez:
 
-Os cadastros são armazenados por `chrome.storage.local` na instalação atual do navegador. Eles não são sincronizados entre aparelhos nem enviados pela extensão. A extensão tem acesso apenas às páginas sob `https://www.nfse.gov.br/EmissorNacional/`, para preencher os formulários nesse endereço. Desinstalar a extensão pode remover os perfis.
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\ativar.ps1
+```
 
-## Compatibilidade e validação
+O Agendador do Windows verifica a versão publicada na branch `main` uma vez por hora, na sua conta. Quando encontra uma versão maior, baixa e confere os arquivos do mesmo commit. Ele aplica a atualização na mesma pasta quando Chrome e Edge estão fechados, incluindo processos em segundo plano. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
 
-O mapeamento dos campos Pessoas foi conferido na interface real do portal na versão 1.6.0.0: `pnlComprasGov`, `pnlTomador`, `pnlDestinatario`, `pnlIntermediario`, `btn_Tomador_Inscricao_pesquisar`, além do texto “LOGADO COMO”. O fluxo da aba Serviço foi preparado a partir da captura fornecida. A extensão não foi instalada nem executada no seu navegador; o preenchimento precisa de validação prática nas duas etapas com perfis de teste. As opções dinâmicas de município e códigos podem mudar conforme atualizações do portal. Não foi realizado teste de emissão.
+Para desativar:
 
-## Repositório
+```powershell
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.ps1
+```
 
-Código-fonte: https://github.com/BlackGen3ral/nfse-automatico. O repositório contém apenas a extensão e esta documentação; os perfis empresariais são criados no navegador e não fazem parte do código.
+## Validação no portal
+
+Os painéis da etapa Pessoas foram identificados na interface do Emissor Nacional. As seleções da etapa Serviço usam os rótulos da tela fornecida. O novo fluxo e a atualização agendada ainda precisam ser validados em uso real.
 
