@@ -401,7 +401,9 @@
       const result = predicate();
       if (result) { if (waitingShown) guide.restore(); return result; }
       if (!waitingShown && Date.now() - startedAt > 1300) { guide.wait(label); waitingShown = true; }
-      await new Promise((resolve) => setTimeout(resolve, 140));
+      // Reage mais cedo aos controles que o portal libera logo após a seleção.
+      const interval = Date.now() - startedAt < 1500 ? 60 : 140;
+      await new Promise((resolve) => setTimeout(resolve, interval));
     } while (Date.now() < deadline);
     if (waitingShown) guide.restore();
     throw new Error(label);
