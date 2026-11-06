@@ -2,8 +2,6 @@
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
-O atalho **Abrir Emissor Nacional** leva à etapa **Pessoas** em uma nova guia.
-
 Use **Entrar com certificado** para ir direto ao acesso por certificado digital do Emissor Nacional. Se o navegador apresentar a lista de certificados ou solicitar o PIN, conclua essa etapa na janela do navegador.
 
 O fluxo pesquisa os CNPJs em **Pessoas**, aplica a configuração tributária e a descrição em **Serviço**, informa o valor e os códigos combinados em **Valores** e avança para a **Revisão**. Você confere os dados e confirma a emissão no portal.
@@ -30,7 +28,9 @@ A atualização é opcional e funciona no Windows. No PowerShell, aberto na past
 powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\ativar.ps1
 ```
 
-O Agendador do Windows consulta a branch `main` do GitHub na sua conta. A primeira verificação começa na ativação e, depois, ocorre a cada hora. Uma versão nova é baixada e verificada mesmo com o navegador aberto. O painel mostra quando ela está pronta. Feche Chrome e Edge por completo, incluindo processos em segundo plano, para que a instalação ocorra na mesma pasta em até dois minutos. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
+O Agendador do Windows consulta a branch `main` do GitHub na sua conta. A primeira verificação começa na ativação e, depois, ocorre a cada hora. A tarefa usa um iniciador silencioso para rodar em segundo plano. Se a tarefa já existia antes da versão 0.2.9, execute a ativação novamente para trocar o iniciador.
+
+Uma versão nova é baixada e verificada mesmo com o navegador aberto. O painel mostra quando ela está pronta. Feche Chrome e Edge por completo, incluindo processos em segundo plano, para que a instalação ocorra na mesma pasta em até dois minutos. A próxima abertura do navegador carrega os arquivos novos. Mantenha a pasta no mesmo lugar após a ativação.
 
 Para desativar:
 
