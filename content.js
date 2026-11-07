@@ -356,15 +356,47 @@
         .worker-avatar:after{content:"✧  ·  ✦";position:absolute;left:8px;top:0;color:#299e62;font-size:17px;pointer-events:none;animation:magic-spark 2s ease-in-out infinite reverse}
         .worker[data-waiting=true] .hand{animation-duration:3s}
         .target:after{content:"✦";position:absolute;right:-13px;top:-16px;color:#20a765;font-size:22px;text-shadow:0 0 12px #7af4b3;animation:magic-spark 1.4s ease-in-out infinite}
-        @keyframes cast-spell{0%,100%{transform:rotate(-40deg)}50%{transform:rotate(-95deg)}}
+        @keyframes cast-spell{0%,100%{transform:rotate(20deg)}35%{transform:rotate(62deg)}65%{transform:rotate(35deg)}}
         @keyframes magic-spark{0%,100%{opacity:.2;transform:translateY(3px) scale(.75)}50%{opacity:1;transform:translateY(-4px) scale(1.08)}}
+        .worker{width:min(300px,calc(100vw - 36px));gap:8px;padding:10px 12px}
+        .worker-avatar{flex-basis:92px;height:96px}
+        .worker .robot{margin-top:14px;animation:spell-bounce 1.8s ease-in-out infinite}
+        .worker .antenna{display:none}
+        .worker .robot:before{content:"";position:absolute;z-index:3;left:15px;top:-13px;width:38px;height:29px;background:radial-gradient(circle at 59% 61%,#dcffb5 0 2px,transparent 2.5px),linear-gradient(120deg,#b5efce,#32875c);clip-path:polygon(12% 100%,44% 0,66% 16%,100% 100%);transform:rotate(9deg)}
+        .worker .robot:after{content:"";position:absolute;z-index:4;left:9px;top:10px;width:49px;height:7px;border:1px solid #377d59;border-radius:50%;background:#8edfb0;transform:rotate(9deg);box-shadow:0 2px 2px #1e73432a}
+        .worker .hand:before{height:36px;width:5px;box-shadow:0 0 8px #53d99680;transform:rotate(8deg)}
+        .worker .hand:after{left:0;top:-34px}
+        .worker-avatar:after{left:63px;top:21px;font-size:19px}
+        .worker .face:before{content:"";position:absolute;left:7px;top:5px;width:9px;height:2px;border-radius:2px;background:#8df0bc;transform:rotate(-14deg);box-shadow:23px 5px 0 #8df0bc}
+        .reaction-bubble{position:absolute;right:0;bottom:2px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1px solid #a7dfbc;background:#f4fff7;color:#197a4b;box-shadow:0 2px 6px #26754c18;font:700 17px/1 system-ui}
+        .reaction-bubble:after{content:"✦"}
+        .worker[data-reaction=waiting] .reaction-bubble:after{content:"◷"}
+        .worker[data-reaction=waiting] .hand{animation:none;transform:rotate(20deg)}
+        .worker[data-reaction=waiting] .robot{animation:patient-bob 3s ease-in-out infinite}
+        .worker[data-reaction=waiting] .eye{animation:curious-eyes 2.4s ease-in-out infinite}
+        .worker[data-reaction=waiting] .face:before{transform:rotate(9deg);opacity:.65}
+        .worker[data-reaction=confirmed] .reaction-bubble:after{content:"✓"}
+        .worker[data-reaction=confirmed] .robot{animation:happy-hop .6s ease-out both}
+        .worker[data-reaction=confirmed] .eye{height:5px;border-top:3px solid #baffd5;border-radius:8px 8px 0 0;background:transparent;animation:none}
+        .worker[data-reaction=confirmed] .face:before{opacity:0}
+        .worker[data-reaction=confirmed] .arm-left{animation:none;transform:rotate(110deg)}
+        .worker[data-reaction=confirmed] .smile{width:12px;height:6px;left:21px}
+        .field-confirmed{position:absolute;right:7px;top:-13px;display:none;place-items:center;width:25px;height:25px;border:2px solid #fff;border-radius:50%;background:#14955b;color:#fff;box-shadow:0 3px 12px #138f5a40;font:700 16px/1 system-ui}
+        .target[data-confirmed=true]{border-color:#16a363;background:#aaf0c414;box-shadow:0 0 0 4px #3bc28426,0 0 18px #32c77b30}
+        .target[data-confirmed=true] .field-confirmed{display:grid;animation:check-pop .28s ease-out both}
+        .card[data-mood=error] .smile{border-bottom:0;border-top:2px solid #3a7d58}
+        @keyframes spell-bounce{0%,100%{transform:translateY(0) rotate(-4deg)}45%{transform:translateY(-4px) rotate(4deg)}70%{transform:translateY(-2px) rotate(-1deg)}}
+        @keyframes patient-bob{50%{transform:translateY(-2px) rotate(3deg)}}
+        @keyframes curious-eyes{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
+        @keyframes happy-hop{0%,100%{transform:translateY(0)}35%{transform:translateY(-9px) rotate(-6deg)}65%{transform:translateY(-3px) rotate(5deg)}}
+        @keyframes check-pop{from{opacity:0;transform:scale(.65)}to{opacity:1;transform:scale(1)}}
         @media(prefers-reduced-motion:reduce){.worker .hand,.worker .hand:after,.worker-avatar:after,.target:after{animation:none!important}}
       </style>
       <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
-      <div class="target" aria-hidden="true"></div>
+      <div class="target" aria-hidden="true"><span class="field-confirmed">✓</span></div>
       <svg class="cursor" data-cursor xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
       <div class="click" aria-hidden="true"></div>
-      <section class="worker" hidden aria-label="Robô trabalhando"><div class="worker-avatar" aria-hidden="true"></div><div class="worker-copy"><strong>Preparando sua nota</strong><p role="status" aria-live="polite"></p></div></section>
+      <section class="worker" hidden aria-label="Robô trabalhando"><div class="worker-avatar" aria-hidden="true"><span class="reaction-bubble"></span></div><div class="worker-copy"><strong>Preparando sua nota</strong><p role="status" aria-live="polite"></p></div></section>
       <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
           <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
@@ -402,7 +434,16 @@
       shadePath.setAttribute("d", outline);
     }
     const click = root.querySelector(".click");
-    let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer, presenting = false, observedBody;
+    let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer, reactionTimer, presenting = false, observedBody;
+    function react(next) {
+      clearTimeout(reactionTimer);
+      worker.dataset.reaction = next;
+      if (next !== "confirmed") ring.dataset.confirmed = "false";
+      if (next === "confirmed") reactionTimer = setTimeout(() => {
+        worker.dataset.reaction = worker.dataset.waiting === "true" ? "waiting" : "casting";
+        ring.dataset.confirmed = "false";
+      }, 900);
+    }
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const mountObserver = window.MutationObserver ? new window.MutationObserver(() => {
       if (presenting && !dismissed && !host.isConnected) { attach(); position(); }
@@ -423,6 +464,7 @@
     }
     function clearTarget() {
       target = null; spotlight();
+      ring.dataset.confirmed = "false";
       ring.style.display = cursor.style.display = click.style.display = "none";
     }
     function position() {
@@ -437,7 +479,7 @@
       cursor.style.display = "block";
       cursor.style.transform = "translate(" + Math.max(0, Math.min(r.right-8, innerWidth-40)) + "px," + Math.max(0, Math.min(r.top+r.height/2, innerHeight-48)) + "px)";
     }
-    root.querySelector(".close").onclick = () => { dismissed = true; presenting = false; mountObserver?.disconnect(); observedBody = null; clearInterval(dismissTimer); host.remove(); clearTarget(); };
+    root.querySelector(".close").onclick = () => { dismissed = true; presenting = false; mountObserver?.disconnect(); observedBody = null; clearInterval(dismissTimer); clearTimeout(reactionTimer); host.remove(); clearTarget(); };
     root.querySelector(".min").onclick = (event) => {
       const mini = card.dataset.mini !== "true";
       card.dataset.mini = String(mini);
@@ -447,10 +489,11 @@
     };
     window.addEventListener("scroll", position, {passive:true,capture:true});
     window.addEventListener("resize", position, {passive:true});
-    window.addEventListener("pagehide", () => { presenting = false; mountObserver?.disconnect(); observedBody = null; });
+    window.addEventListener("pagehide", () => { presenting = false; clearTimeout(reactionTimer); mountObserver?.disconnect(); observedBody = null; });
     return {
       show(next, text) {
         clearInterval(dismissTimer);
+        react(next === "error" ? "error" : next === "review-ready" ? "review" : "casting");
         presenting = true;
         phase = next; baseText = text;
         retry.hidden = next !== "error" || !(servicePath.test(location.pathname) || valuesPath.test(location.pathname));
@@ -494,10 +537,12 @@
         });
         if (next === "error" || next === "review-ready" || next === "review") clearTarget();
       },
-      wait(label) { keepWorking(); if (host.isConnected && phase !== "error") { worker.dataset.waiting = "true"; workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
-      restore() { keepWorking(); worker.dataset.waiting = "false"; workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
+      wait(label) { keepWorking(); if (host.isConnected && !["error", "review-ready"].includes(phase)) { worker.dataset.waiting = "true"; react("waiting"); workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
+      restore() { if (["error", "review-ready"].includes(phase)) return; keepWorking(); worker.dataset.waiting = "false"; react("casting"); workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
       confirm(element) {
+        if (dismissed || ["error", "review-ready"].includes(phase)) return;
         this.point(element);
+        if (ring.style.display === "block") { ring.dataset.confirmed = "true"; react("confirmed"); }
         if (ring.style.display === "block" && !reduced()) {
           ring.animate?.([{boxShadow:"0 0 0 0 #4ee79a80"},{boxShadow:"0 0 0 8px #4ee79a20"},{boxShadow:"0 0 0 4px #3bc28420"}], {duration:420,easing:"ease-out"});
         }
@@ -506,6 +551,7 @@
         if (dismissed || phase === "error" || phase === "review-ready" || !element) return;
         keepWorking();
         if (target === element && Date.now()-lastAction < 500) return;
+        ring.dataset.confirmed = "false";
         lastAction = Date.now();
         const chosen = element.id && document.getElementById(element.id+"_chosen");
         const select2 = element.id && document.getElementById("select2-"+element.id+"-container");
