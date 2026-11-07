@@ -74,7 +74,6 @@ function renderButton() {
   const portalState = document.getElementById("portal-state");
   portalState.textContent = portalOpen ? "Portal aberto" : "Aguardando portal";
   portalState.dataset.open = String(portalOpen);
-  document.getElementById("workspace-title").textContent = inValues ? "Confira os valores." : inService ? "Continue no serviço." : "Sua próxima nota.";
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
   if (busy || starting) document.querySelector("#fill-label").textContent = starting ? "Preparando sua nota…" : "Preenchendo nota…";

@@ -81,4 +81,23 @@ a:focus-visible,button:focus-visible,summary:focus-visible{outline:2px solid var
 @media(max-width:359px){.hero{padding:15px 13px;gap:8px;grid-template-columns:36px minmax(0,1fr) auto}.app-icon{width:36px;height:36px;border-radius:11px}.app-icon img{width:29px;height:29px}h1{font-size:16px}.eyebrow{font-size:7px;letter-spacing:.1em}.version{font-size:8px;padding:2px 4px}main{padding:20px 13px}.workspace-intro h2{font-size:23px}.intro-art{flex-basis:59px;width:59px;height:70px}.workspace-intro p{font-size:11px}form{padding:18px 14px}.form-intro h2{font-size:19px}.draft-tag{font-size:8px}.workflow-heading{font-size:7px;letter-spacing:.025em}.portal-state{font-size:8px}textarea{min-height:158px}.action-dock{padding-inline:13px}#fill{font-size:13px}.label-row{flex-wrap:wrap;gap:0 5px}}
 @media(max-width:279px){.version{display:none}.hero{grid-template-columns:36px minmax(0,1fr)}.intro-art{display:none}.steps li{font-size:9px}.draft-tag{display:none}.workflow-heading>span:first-child{max-width:110px}.certificate-copy>span{font-size:11px}}
 @media(max-height:650px){.hero{padding-block:12px}.workspace-intro{margin-bottom:18px}.workspace-intro h2{font-size:23px}.intro-art{height:70px}.action-dock{padding-block:10px}.footer-meta{margin-top:9px;padding-top:9px}.review-note{margin-top:6px}}
+/* A entrada de dados tem prioridade sobre a apresentação do painel. */
+.hero{padding-block:12px}
+main{padding-block:12px}
+.portal-access{margin-bottom:12px}
+.certificate-access{padding:8px 12px}
+.certificate-icon{width:30px;height:30px;border-radius:8px}
+.certificate-copy small{display:none}
+.workflow-heading{margin-bottom:9px}
+.steps{margin-bottom:14px}
+.steps li{flex-direction:row;justify-content:center;gap:5px;min-height:32px;border-radius:9px}
+.steps li:before{display:none}
+.steps li>span{width:22px;height:22px;border-radius:7px;font-size:10px;flex-shrink:0}
+.steps li.active{background:#eaf5ee}
+.steps li.active>span{box-shadow:none}
+.form-intro{padding-bottom:14px;margin-bottom:18px}
+.form-intro .section-kicker{display:none}
+.form-intro h2{margin:0}
+@media(min-width:720px){.form-intro{margin-bottom:0}}
+@media(max-width:359px){.steps li{font-size:9px;gap:3px}.steps li>span{width:19px;height:19px;font-size:9px}}
 @media(prefers-reduced-motion:reduce){*,*:before,*:after{animation:none!important;transition:none!important}}
