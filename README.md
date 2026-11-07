@@ -57,3 +57,10 @@ O assistente identifica avisos de validação, sessão expirada e verificações
 Descrição e valor do fluxo ficam na sessão da guia. Após uma interrupção ou recarga em Serviço ou Valores, a extensão pode retomar o mesmo rascunho ativo, com limite de duas retomadas automáticas por rascunho. O botão Tentar novamente nesta etapa permite repetir o preenchimento de um rascunho com erro, depois de corrigir o problema. Troca de rascunho, dados vencidos e etapas de avanço pendentes bloqueiam a retomada automática. A extensão não atualiza a página, não faz login, não resolve CAPTCHA e não confirma emissão.
 
 Esses cenários foram verificados em formulários simulados; a leitura depende dos avisos e controles que o portal apresentar.
+## Controle pelo Android
+
+O NFS-e Conecta conecta o Android a um PC Windows pela internet. Instale o programa do PC e esta extensão, abra o portal pelo botão do programa e conclua o acesso com certificado. Digite no Android o código temporário mostrado pelo programa. O celular envia CNPJ, descrição e valor; o PC abre Pessoas e a extensão avança até a revisão.
+
+O programa do PC recebe comandos autenticados pela sua própria conexão HTTPS. A extensão se comunica apenas com o serviço local em 127.0.0.1:17846, usando uma chave de pareamento local. O conteúdo dos comandos não é gravado no GitHub. A confirmação de sucesso no celular depende da chegada ao rascunho correto da revisão. A emissão é confirmada pelo usuário no portal.
+
+Central de acesso e downloads: https://nfse-conecta.arthurgabrielfera.workers.dev

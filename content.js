@@ -861,6 +861,7 @@
       if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
           state.visualDraft === draftId() && !document.querySelector("input[type=password]")) {
         guide.show("review-ready", "Preenchimento concluído. Confira os dados e confirme a emissão no portal.");
+        chrome.runtime.sendMessage({type:"nfse:remote-result"}).catch(()=>{});
       }
       return;
     }
@@ -934,4 +935,11 @@
   });
   window.addEventListener("pageshow", () => resume().catch(() => {}));
   resume().catch(() => {});
+  const remoteMatch = location.hash.match(/^#nfse-connect=([a-f0-9]{64})$/);
+  if (remoteMatch && peoplePath.test(location.pathname)) {
+    history.replaceState(null, "", location.pathname + location.search);
+    chrome.runtime.sendMessage({type:"nfse:connect-pc",bridgeKey:remoteMatch[1]}).then((reply)=>{
+      if (!reply?.ok) guide.show("error",reply?.error || "Confira a conexão com o NFS-e Conecta no PC.");
+    }).catch(()=>guide.show("error","Não foi possível conectar ao programa do PC."));
+  }
 })();
