@@ -2,7 +2,7 @@
   color-scheme: light;
   font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
   color: #16382e;
-  background: #edf4ee;
+  background: #f0faf4;
   --green: #08714f;
   --muted: #4a665a;
   --line: #d5e5da;
@@ -14,16 +14,15 @@ html, body { width: 100%; min-width: 0; height: 100%; }
 body { margin: 0; display: flex; flex-direction: column; overflow: hidden; }
 .hero {
   flex: none; display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 9px;
-  padding: 14px 16px; color: white;
-  background: radial-gradient(ellipse at 95% -25%, #41876b, transparent 64%),
-    repeating-linear-gradient(135deg, #c0ffd40a 0 1px, transparent 1px 13px), #102f26;
+  padding: 14px 16px; color: #14533c;
+  background: radial-gradient(ellipse at 100% 0%, #d3f4df, transparent 65%), linear-gradient(135deg,#fff,#effbf3);
   border-bottom: 3px solid #8ee3b6;
 }
 .hero img { border-radius: 11px; outline: 1px solid #8ee3b63a; }
 h1 { margin: 0; font-size: 22px; line-height: 1.04; letter-spacing: -.04em; }
-.eyebrow { margin: 0 0 4px; color: #a6e9c8; font-size: 9px; font-weight: 800; letter-spacing: .15em; }
-.subtitle { margin: 4px 0 0; color: #d0e8db; font-size: 11px; }
-.version { align-self: start; padding: 4px 7px; border: 1px solid #b7e7cf5e; border-radius: 999px; color: #ecfff1; font: 10px ui-monospace, Consolas, monospace; white-space: nowrap; }
+.eyebrow { margin: 0 0 4px; color: #287a4e; font-size: 9px; font-weight: 800; letter-spacing: .15em; }
+.subtitle { margin: 4px 0 0; color: #567b64; font-size: 11px; }
+.version { align-self: start; padding: 4px 7px; border: 1px solid #bde3cc; border-radius: 999px; color: #28734d; font: 10px ui-monospace, Consolas, monospace; white-space: nowrap; }
 main { flex: 1; min-height: 0; overflow: hidden auto; padding: 14px 17px 11px; }
 .portal-access { margin-bottom: 8px; }
 .portal-access a { display: flex; align-items: center; gap: 8px; padding: 6px 9px; border: 1px solid #b9d9c5; border-radius: 8px; background: #e1f0e5; color: #17583f; font-size: 12px; text-decoration: none; }
@@ -67,7 +66,7 @@ input[aria-invalid="true"] { border-color: #a94630; }
 .action-dock { flex: none; padding: 12px 14px; border-top: 1px solid #c4ddcf; background: #f7fcf8; box-shadow:0 -6px 20px #19402a09; }
 #status { min-height: 14px; margin: 0 1px 8px; font-size: 11px; color: #36594a; }
 #status[data-error="true"] { color: #8c311d; }
-button { display: flex; width: 100%; align-items: center; justify-content: space-between; min-height: 52px; border: 0; border-radius: 8px; padding: 10px 13px 10px 16px; font: 750 15px/1.3 "Segoe UI",system-ui,sans-serif; color: white; background:linear-gradient(135deg,#107e59,#075b41);box-shadow:0 4px 10px #0b5c3420; cursor: pointer; }
+button { display: flex; width: 100%; align-items: center; justify-content: space-between; min-height: 52px; border: 0; border-radius: 8px; padding: 10px 13px 10px 16px; font: 750 15px/1.3 "Segoe UI",system-ui,sans-serif; color: white; background:linear-gradient(135deg,#13894f,#087a45);box-shadow:0 4px 10px #0b5c3420; cursor: pointer; }
 button:disabled { color: #3b5f4b; background:#dcebe2;box-shadow:none;cursor:default; }
 .arrow { display: grid; width: 30px; height: 30px; place-items: center; border-radius: 5px; background: #ffffff25; font-size: 20px; }
 .footer-meta { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-top: 9px; color: #4e625a; font-size: 10px; }
@@ -103,7 +102,7 @@ input:focus,textarea:focus{background:#fff;border-color:#348c63}input,textarea{t
 #fill .arrow > span { display: block; }
 #fill:not(:disabled) .arrow > span { animation: fill-arrow 3.2s ease-in-out infinite; }
 #fill:hover:not(:disabled), #fill:focus-visible:not(:disabled) { box-shadow: 0 5px 15px #0b5c3438; }
-#fill[aria-busy="true"] { color: #fff; background: #086549; cursor: progress; }
+#fill[aria-busy="true"] { color: #fff; background: #12854d; cursor: progress; }
 #fill[aria-busy="true"]::before { animation: fill-launch 1.6s ease-in-out infinite; }
 #fill[aria-busy="true"] .arrow > span { visibility: hidden; animation: none; }
 #fill[aria-busy="true"] .arrow::after {

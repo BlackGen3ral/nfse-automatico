@@ -213,19 +213,19 @@
 
   function createGuide() {
     const host = document.createElement("div");
-    host.style.cssText = "all:initial;position:fixed;bottom:18px;right:18px;z-index:2147483646;pointer-events:none";
+    host.style.cssText = "all:initial;position:fixed;bottom:18px;right:18px;z-index:2147483647;pointer-events:none;display:block;visibility:visible";
     const root = host.attachShadow({ mode: "open" });
     root.innerHTML = `
       <style>
         :host{font:13px/1.4 system-ui,sans-serif;color:#183f32}
         *{box-sizing:border-box}
         .card[hidden]{display:none!important}
-        .card{position:relative;isolation:isolate;width:min(368px,calc(100vw - 36px));border:1px solid #68c49b66;border-radius:20px;background:radial-gradient(ellipse at 10% 0%,#285e4a 0%,transparent 64%),linear-gradient(145deg,#132f28,#081d18);color:#e6f5ec;font:13px/1.5 "Segoe UI",system-ui,sans-serif;box-shadow:0 18px 55px #00170f59,inset 0 1px #b9f9d628;pointer-events:auto;overflow:hidden;animation:arrive .42s cubic-bezier(.2,.8,.2,1) both}
+        .card{position:relative;isolation:isolate;width:min(368px,calc(100vw - 36px));border:1px solid #bde7cd;border-radius:20px;background:linear-gradient(145deg,#fff,#f3fcf5);color:#214e38;font:13px/1.5 "Segoe UI",system-ui,sans-serif;box-shadow:0 18px 55px #1a6c3a22,inset 0 1px #b9f9d628;pointer-events:auto;overflow:hidden;animation:arrive .42s cubic-bezier(.2,.8,.2,1) both}
         .top{position:relative;display:flex;align-items:center;gap:14px;padding:19px 16px 12px}
-        .brand{font-size:9px;letter-spacing:.15em;color:#a4dabf;font-weight:750}
-        h2{font:700 17px/1.25 "Segoe UI",system-ui,sans-serif;letter-spacing:-.02em;margin:5px 0 0;color:#f1fff6}
+        .brand{font-size:9px;letter-spacing:.15em;color:#39805a;font-weight:750}
+        h2{font:700 17px/1.25 "Segoe UI",system-ui,sans-serif;letter-spacing:-.02em;margin:5px 0 0;color:#164e32}
         .controls{margin-left:auto;display:flex;align-self:flex-start;gap:3px}
-        button{border:1px solid #c0f2d521;background:#ffffff0b;color:#c2e6d1;border-radius:7px;padding:3px 7px;font:13px/1.3 "Segoe UI",system-ui,sans-serif;cursor:pointer}button:hover{background:#ffffff1f}
+        button{border:1px solid #cce9d7;background:#f1faf4;color:#397555;border-radius:7px;padding:3px 7px;font:13px/1.3 "Segoe UI",system-ui,sans-serif;cursor:pointer}button:hover{background:#e3f5e9}
         button:focus-visible{outline:2px solid #9becbf;outline-offset:2px}
         .robot{position:relative;flex:none;width:66px;height:72px;animation:bob 2.8s ease-in-out infinite;filter:drop-shadow(0 3px 2px #0b4b2320)}
         .antenna{position:absolute;left:32px;top:0;width:3px;height:12px;background:#367b5c}
@@ -244,15 +244,15 @@
         .card[data-mood=review] .eye{height:5px;background:transparent;border-top:3px solid #baffd5;border-radius:6px 6px 0 0}
         .card[data-mood=review] .hand{transform:rotate(-125deg);height:19px}
         .card[data-mood=error] .eye{transform:rotate(-12deg)}
-        .message{position:relative;margin:0 16px 16px;padding:10px 12px;border:1px solid #93dcb129;border-radius:10px;background:#001a122e;color:#d7ecdf;font:13px/1.5 "Segoe UI",system-ui,sans-serif;min-height:44px}
-        ol{position:relative;display:grid;grid-template-columns:repeat(4,1fr);padding:13px 11px 15px;margin:0;border-top:1px solid #81cc9d25;list-style:none;background:#05171150}
-        li{position:relative;text-align:center;font:11px/1.4 "Segoe UI",system-ui,sans-serif;color:#a5c4b1}li:before{content:"";position:absolute;top:13px;left:-29%;width:58%;height:1px;background:#6b9b7b52}li:first-child:before{display:none}li[data-state=done]+li:before{background:#78dca3}
-        li span{position:relative;display:grid;place-items:center;margin:0 auto 6px;width:27px;height:27px;border:1px solid #8ebd9e47;border-radius:9px;background:#15362b;color:#c3ddcb;font-weight:750;transition:background .25s,box-shadow .25s}
-        li[data-state=active]{color:#ecfff3;font-weight:750}
-        li[data-state=active] span{background:#a5efc2;color:#103c29;border-color:#d0ffdf;box-shadow:0 0 16px #79e5ab55;animation:pulse 2.2s ease-in-out infinite}
-        li[data-state=done] span{background:#245a40;color:#b0f2c7;border-color:#77c59155}
+        .message{position:relative;margin:0 16px 16px;padding:10px 12px;border:1px solid #d2e9da;border-radius:10px;background:#f1faf4;color:#365e49;font:13px/1.5 "Segoe UI",system-ui,sans-serif;min-height:44px}
+        ol{position:relative;display:grid;grid-template-columns:repeat(4,1fr);padding:13px 11px 15px;margin:0;border-top:1px solid #81cc9d25;list-style:none;background:#edf8f0}
+        li{position:relative;text-align:center;font:11px/1.4 "Segoe UI",system-ui,sans-serif;color:#537c63}li:before{content:"";position:absolute;top:13px;left:-29%;width:58%;height:1px;background:#6b9b7b52}li:first-child:before{display:none}li[data-state=done]+li:before{background:#78dca3}
+        li span{position:relative;display:grid;place-items:center;margin:0 auto 6px;width:27px;height:27px;border:1px solid #8ebd9e47;border-radius:9px;background:#f0f9f3;color:#486c55;font-weight:750;transition:background .25s,box-shadow .25s}
+        li[data-state=active]{color:#157a45;font-weight:750}
+        li[data-state=active] span{background:#12854d;color:#fff;border-color:#d0ffdf;box-shadow:0 0 16px #79e5ab55;animation:pulse 2.2s ease-in-out infinite}
+        li[data-state=done] span{background:#dff4e6;color:#267848;border-color:#77c59155}
         .card[data-mood=error]{border-color:#c79257}
-        .card[data-mood=error] h2{color:#ffe2b6}.card[data-mood=error] .message{border-color:#e5b56b50;color:#ffebce}
+        .card[data-mood=error] h2{color:#805820}.card[data-mood=error] .message{border-color:#e5b56b50;color:#77552d}
         .card[data-mood=error] .robot,.card[data-mood=review] .robot{animation:none}
         .card[data-mood=review] .hand:after{content:"";position:absolute;width:5px;height:8px;left:-4px;bottom:2px;border-radius:3px;background:#b6ebc3;border:1px solid #397c57}
         .card[data-mood=review] .smile{height:6px;border-bottom-width:3px}
@@ -278,24 +278,26 @@
         @keyframes arrive{from{opacity:0;transform:translateY(18px) scale(.97)}to{opacity:1;transform:translateY(0) scale(1)}}
         @keyframes sweep{0%,70%{transform:translateX(-160%) skewX(-18deg);opacity:0}78%{opacity:.7}100%{transform:translateX(180%) skewX(-18deg);opacity:0}}
         .card:before{content:"";position:absolute;z-index:-1;inset:-30%;background:linear-gradient(90deg,transparent,#abffd30c,transparent);pointer-events:none;animation:sweep 6s ease-in-out infinite}
-        .card[data-mood=review]{border-color:#a7efc780;box-shadow:0 18px 55px #00170f59,0 0 25px #80d7a21a}.card[data-mood=review]:before,.card[data-mood=error]:before{animation:none;opacity:0}
-        .robot{filter:drop-shadow(0 5px 8px #001c1b80)}
+        .card[data-mood=review]{border-color:#a7efc780;box-shadow:0 18px 55px #1a6c3a22,0 0 25px #80d7a21a}.card[data-mood=review]:before,.card[data-mood=error]:before{animation:none;opacity:0}
+        .robot{filter:drop-shadow(0 3px 5px #266e3d24)}
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
-        .retry[hidden]{display:none!important}.retry{display:block;margin:0 16px 12px;padding:9px 12px;border-color:#94dfb755;background:#1b5b43;color:#edfff4;cursor:pointer}
-        .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
+        .retry[hidden]{display:none!important}.retry{display:block;margin:0 16px 12px;padding:9px 12px;border-color:#94dfb755;background:#12854d;color:#edfff4;cursor:pointer}
+        .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#54836a;font-variant-numeric:tabular-nums}
         .worker[hidden]{display:none!important}
-        .worker{position:relative;display:flex;align-items:center;gap:10px;width:min(280px,calc(100vw - 36px));padding:10px 14px;border:1px solid #8ed8ad66;border-radius:18px;background:linear-gradient(135deg,#1c4c3df5,#0c2921f5);box-shadow:0 10px 30px #001a1638;color:#e6f7ee;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
+        .worker{position:relative;display:flex;align-items:center;gap:10px;width:min(280px,calc(100vw - 36px));padding:10px 14px;border:1px solid #99dcb4;border-radius:18px;background:linear-gradient(135deg,#fff,#eafbf0);box-shadow:0 10px 30px #001a1638;color:#24533b;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
         .worker-avatar{position:relative;flex:0 0 78px;height:80px}
         .worker .hand{animation:work-arm .8s ease-in-out infinite}
         .worker .arm-left{animation:work-left .9s ease-in-out infinite}
         .worker[data-waiting=true] .hand,.worker[data-waiting=true] .arm-left{animation-duration:2s}
-        .worker-copy{min-width:0}.worker strong{display:block;font-size:12px;color:#e5ffed}.worker p{margin:5px 0 0;color:#b6ddc7;font-size:11px;overflow-wrap:anywhere}
-        .workstation{position:absolute;left:30px;top:45px;width:39px;height:26px;border:2px solid #94d9ae;border-radius:4px;background:#092c24;box-shadow:0 3px 6px #001a1640;transform:rotate(-5deg)}
-        .workstation:before{content:"";position:absolute;inset:5px;background:repeating-linear-gradient(0deg,#88eebd 0 2px,transparent 2px 5px);opacity:.6;animation:typing-screen 1.4s ease-in-out infinite}
+        .worker-copy{min-width:0}.worker strong{display:block;font-size:12px;color:#127442}.worker p{margin:5px 0 0;color:#4c755d;font-size:11px;overflow-wrap:anywhere}
+        .workstation{position:absolute;left:30px;top:45px;width:39px;height:26px;border:2px solid #94d9ae;border-radius:4px;background:#d8f8e4;box-shadow:0 3px 6px #001a1640;transform:rotate(-5deg)}
+        .workstation:before{content:"";position:absolute;inset:5px;background:repeating-linear-gradient(0deg,#25995b 0 2px,transparent 2px 5px);opacity:.6;animation:typing-screen 1.4s ease-in-out infinite}
         .workstation:after{content:"";position:absolute;left:-5px;bottom:-6px;width:45px;height:5px;border-radius:0 0 5px 5px;background:#a6dfbb;border-bottom:2px solid #4c9471}
         @keyframes typing-screen{50%{opacity:.95}}
         .cursor,.click{z-index:2}
-        .card[data-mood=error]{border-color:#e9c07d80}
+        .card[data-mood=error]{border-color:#e9c07d}.card[data-mood=error] .message{background:#fff8ed}
+        .worker{z-index:1;box-shadow:0 8px 24px #1d683224}
+        .worker strong:before{content:"";display:inline-block;width:6px;height:6px;margin-right:6px;border-radius:50%;background:#20a963;box-shadow:0 0 0 3px #dff7e8}
       </style>
       <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
       <div class="target" aria-hidden="true"></div>
@@ -339,9 +341,25 @@
       shadePath.setAttribute("d", outline);
     }
     const click = root.querySelector(".click");
-    let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer;
+    let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer, presenting = false, observedBody;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
-    function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
+    const mountObserver = window.MutationObserver ? new window.MutationObserver(() => {
+      if (presenting && !dismissed && !host.isConnected) { attach(); position(); }
+    }) : null;
+    function attach() {
+      if (!presenting || dismissed || typeof document === "undefined" || !document?.body) { mountObserver?.disconnect(); observedBody = null; return; }
+      if (!host.isConnected) document.body.append(host);
+      if (observedBody !== document.body) {
+        mountObserver?.disconnect(); observedBody = null;
+        if (document.documentElement) mountObserver?.observe(document.documentElement, {childList:true});
+        mountObserver?.observe(document.body, {childList:true});
+        observedBody = document.body;
+      }
+    }
+    function keepWorking() {
+      if (dismissed || ["error", "review-ready"].includes(phase)) return;
+      presenting = true; worker.hidden = false; card.hidden = true; attach();
+    }
     function clearTarget() {
       target = null; spotlight();
       ring.style.display = cursor.style.display = click.style.display = "none";
@@ -358,7 +376,7 @@
       cursor.style.display = "block";
       cursor.style.transform = "translate(" + Math.max(0, Math.min(r.right-8, innerWidth-40)) + "px," + Math.max(0, Math.min(r.top+r.height/2, innerHeight-48)) + "px)";
     }
-    root.querySelector(".close").onclick = () => { dismissed = true; clearInterval(dismissTimer); host.remove(); clearTarget(); };
+    root.querySelector(".close").onclick = () => { dismissed = true; presenting = false; mountObserver?.disconnect(); observedBody = null; clearInterval(dismissTimer); host.remove(); clearTarget(); };
     root.querySelector(".min").onclick = (event) => {
       const mini = card.dataset.mini !== "true";
       card.dataset.mini = String(mini);
@@ -368,9 +386,11 @@
     };
     window.addEventListener("scroll", position, {passive:true,capture:true});
     window.addEventListener("resize", position, {passive:true});
+    window.addEventListener("pagehide", () => { presenting = false; mountObserver?.disconnect(); observedBody = null; });
     return {
       show(next, text) {
         clearInterval(dismissTimer);
+        presenting = true;
         phase = next; baseText = text;
         retry.hidden = next !== "error" || !(servicePath.test(location.pathname) || valuesPath.test(location.pathname));
         shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
@@ -390,9 +410,11 @@
         const closeAt = Date.now() + 10000;
         countdown.textContent = "Fechando em 10 s…";
         dismissTimer = setInterval(() => {
+          if (phase !== next) return;
           const seconds = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000));
           if (!seconds) {
             clearInterval(dismissTimer);
+            presenting = false; mountObserver?.disconnect(); observedBody = null;
             host.remove(); clearTarget();
           } else countdown.textContent = "Fechando em " + seconds + " s…";
         }, 1000);
@@ -410,8 +432,8 @@
         });
         if (next === "error" || next === "review-ready" || next === "review") clearTarget();
       },
-      wait(label) { if (host.isConnected && phase !== "error") { worker.dataset.waiting = "true"; workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
-      restore() { worker.dataset.waiting = "false"; workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
+      wait(label) { keepWorking(); if (host.isConnected && phase !== "error") { worker.dataset.waiting = "true"; workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
+      restore() { keepWorking(); worker.dataset.waiting = "false"; workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
       confirm(element) {
         this.point(element);
         if (ring.style.display === "block" && !reduced()) {
@@ -420,7 +442,7 @@
       },
       point(element, clicked = false) {
         if (dismissed || phase === "error" || phase === "review-ready" || !element) return;
-        attach();
+        keepWorking();
         if (target === element && Date.now()-lastAction < 500) return;
         lastAction = Date.now();
         const chosen = element.id && document.getElementById(element.id+"_chosen");
