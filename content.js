@@ -83,7 +83,9 @@
       const result = Array.from(chosen.querySelectorAll(".chosen-results .active-result"))
         .find((item) => norm(item.textContent) === norm(option.textContent));
       if (!result) return false;
+      guide.point(result, true);
       result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
+      guide.point(opener);
       return element.value === option.value;
     }
     return setNativeValue(element, option.value) && element.value === option.value;
@@ -140,6 +142,7 @@
         if (!result) continue;
         guide.point(result, true);
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
+        guide.point(control);
         await waitFor(label + " · seleção", selected);
         return;
       }
@@ -252,7 +255,7 @@
         .shade[data-active=true]{opacity:1}
         .target{position:fixed;border:2px solid #24ad71;border-radius:7px;pointer-events:none;box-shadow:0 0 0 4px #3bc28420;transition:all .22s ease;display:none}
         .cursor{position:fixed;pointer-events:none;width:32px;height:40px;filter:drop-shadow(0 0 3px #62ffb8) drop-shadow(0 0 9px #13c577b3) drop-shadow(0 2px 2px #001d28b3);transition:transform .22s ease;display:none;left:0;top:0}
-        .click{position:fixed;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
+        .click{position:fixed;opacity:0;width:25px;height:25px;border-radius:50%;border:2px solid #25a66f;pointer-events:none;display:none;left:0;top:0}
         @keyframes bob{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-5px) rotate(2deg)}}
         @keyframes work-arm{0%,100%{transform:rotate(-20deg)}50%{transform:rotate(-42deg)}}
         @keyframes work-left{0%,100%{transform:rotate(18deg)}50%{transform:rotate(35deg)}}
@@ -303,13 +306,12 @@
       shadePath.setAttribute("d", outline);
     }
     const click = root.querySelector(".click");
-    let dismissed = false, phase = "people", baseText = "", target, hideTimer, lastAction = 0, lastStage = null, dismissTimer;
+    let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer;
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     function attach() { if (!host.isConnected && !dismissed) document.body.append(host); }
     function clearTarget() {
       target = null; spotlight();
       ring.style.display = cursor.style.display = click.style.display = "none";
-      clearTimeout(hideTimer);
     }
     function position() {
       if (!target?.isConnected) return clearTarget();
@@ -339,7 +341,8 @@
         phase = next; baseText = text;
         shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
         if (next !== "review-ready") {
-          card.hidden = true; clearTarget();
+          card.hidden = true;
+          if (!["people", "service", "values", "waiting"].includes(next)) clearTarget();
           if (next === "error") host.remove(); else attach();
           return;
         }
@@ -386,7 +389,7 @@
           Object.assign(click.style,{display:"block",transform:"translate("+(r.right-20)+"px,"+(r.top+r.height/2-12)+"px)"});
           click.animate?.([{opacity:1,scale:".5"},{opacity:0,scale:"1.8"}],{duration:450});
         }
-        clearTimeout(hideTimer); hideTimer = setTimeout(clearTarget, 1000);
+        // Mantém a seta visível até a próxima ação ou o fim da etapa.
       }
     };
   }
