@@ -1004,6 +1004,17 @@
   const match = location.hash.match(/^#nfse-connect=([a-f0-9]{64})(?:&port=(\d{5}))?$/);
   let bridgeKey = match?.[1];
   if (match) history.replaceState(null, "", location.pathname + location.search);
+  function entryNotice(text) {
+    let box = document.getElementById("nfse-entry-status");
+    if (!box) {
+      box = document.createElement("div");
+      box.id = "nfse-entry-status";
+      box.setAttribute("role","status");
+      box.style.cssText = "position:fixed;bottom:18px;right:18px;max-width:340px;padding:14px 18px;border:1px solid #b6d9c5;border-radius:14px;background:#f5fff9;color:#126344;font:14px/1.5 system-ui;z-index:2147483647;box-shadow:0 8px 28px #1232";
+      document.documentElement.appendChild(box);
+    }
+    box.textContent = text;
+  }
   let checking = false;
   async function continueEntry() {
     if (checking) return;
@@ -1013,6 +1024,7 @@
         type: "nfse:portal-entry",
         ...(bridgeKey ? { bridgeKey, bridgePort: match[2] ? Number(match[2]) : 17846 } : {}),
       });
+      if (state?.error && bridgeKey) entryNotice(state.error);
       bridgeKey = null;
       if (!state?.active) return;
       const path = location.pathname.replace(/\/$/, "");
@@ -1023,6 +1035,7 @@
       if (/^\/EmissorNacional\/Login$/i.test(path)) {
         const link = document.querySelector('a[href="https://certificado.nfse.gov.br/EmissorNacional/Certificado"]');
         if (link && !link.dataset.nfseOpening) {
+          entryNotice("Extensão conectada. Entrando com o certificado…");
           link.dataset.nfseOpening = "true";
           link.click();
         }
@@ -1036,6 +1049,7 @@
       });
       const peopleLink = peopleLinks.find((link) => /Nova NFS-e - Emissão Completa/i.test(link.getAttribute?.("data-original-title") || link.title || "")) || peopleLinks[0];
       if (peopleLink && !peopleLink.dataset.nfseOpening) {
+        entryNotice("Comando recebido do PC. Abrindo Emissão Completa…");
         peopleLink.dataset.nfseOpening = "true";
         peopleLink.click();
       }

@@ -28,6 +28,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   const bridge = "a".repeat(64);
   let pendingJob = null;
   let controlJobId = job.id, cancelledJobId = "";
+  let requestedOpenUntil = 0;
   const chrome = {
     runtime: { onMessage: { addListener: (f) => listeners.push(f) } },
     storage: { local: storage(local), session: storage(session) },
@@ -45,7 +46,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
     fetches.push({ url, data: options.body ? JSON.parse(options.body) : null });
     return {
       ok: true,
-      json: async () => (url.endsWith("/job") ? {job:pendingJob,command:pendingJob?"open-invoice":null} :
+      json: async () => (url.endsWith("/job") ? {job:pendingJob,command:pendingJob||requestedOpenUntil>Date.now()?"open-invoice":null,openUntil:requestedOpenUntil} :
         url.endsWith("/control") ? {jobId:controlJobId,cancelledJobId} : {ok:true}),
     };
   };
@@ -73,6 +74,9 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   sender.url = "https://www.nfse.gov.br/EmissorNacional/Login";
   local.nfseBridgeKey = bridge;
   assert.equal((await send({ type: "nfse:portal-entry" })).active, false);
+  requestedOpenUntil = Date.now() + 10000;
+  assert.equal((await send({type:"nfse:portal-entry"})).command,"open-invoice");
+  requestedOpenUntil = 0;
   pendingJob = job;
   assert.equal((await send({ type: "nfse:portal-entry" })).active, true);
   sender.url = "https://www.nfse.gov.br/EmissorNacional/";

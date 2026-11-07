@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.4.1";
+ public const string CurrentVersion="1.4.2";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -66,6 +66,7 @@ internal sealed class ConectaForm:Form {
  CheckBox startup;
  TcpListener listener;
  int bridgePort=17846;
+ DateTime openInvoiceUntil=DateTime.MinValue;
  readonly bool background;
  static string Str(Dictionary<string,object> data,string key){return data.ContainsKey(key)&&data[key]!=null?Convert.ToString(data[key]):"";}
  static string Json(object value){return new JavaScriptSerializer().Serialize(value);}
@@ -83,7 +84,7 @@ internal sealed class ConectaForm:Form {
   qrHint=new Label(){Text="Conferindo o pareamento…",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Padding=new Padding(16),ForeColor=Color.FromArgb(65,125,83)};pairingQr.Controls.Add(qrHint);
   Controls.Add(new Label(){Text="Leia o QR com a câmera do celular para conectar.",AutoSize=true,Location=new Point(31,487)});
   pair=Button("Gerar novo QR code",518);pair.Enabled=false;pair.Click+=async delegate{try{if(listener==null)await Initialize();else await Pair();}catch(Exception error){SetStatus(error.Message);}};
-  open=Button("Abrir portal e conectar extensão",568);open.Click+=delegate{OpenPortal();};
+  open=Button("Abrir Emissão Completa no Chrome",568);open.Click+=delegate{OpenPortal();};
   updates=Button("Verificar atualizações",618);updates.Click+=async delegate{await CheckUpdates(true);};
   updates.Width=200;
   var certificate=Button("Configurar certificado",618);
@@ -193,7 +194,9 @@ internal sealed class ConectaForm:Form {
    SetStatus("A conexão com o navegador ainda não está pronta.");
    return;
   }
-  var url="https://certificado.nfse.gov.br/EmissorNacional/Certificado#nfse-connect="+bridgeKey+"&port="+bridgePort;
+  if(listener==null){SetStatus("Conecte o app antes de abrir a emissão.");return;}
+  lock(gate){openInvoiceUntil=DateTime.UtcNow.AddMinutes(9);}
+  var url="https://www.nfse.gov.br/EmissorNacional/Dashboard#nfse-connect="+bridgeKey+"&port="+bridgePort;
   var chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome))chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome)){SetStatus("Instale o Google Chrome e a extensão NFS-e Automático para continuar.");return;}
@@ -277,6 +280,7 @@ internal sealed class ConectaForm:Form {
   lock(gate) {
    if(cancelledJobId==id)return;
    cancelledJobId=id;
+   openInvoiceUntil=DateTime.MinValue;
    waitingForStop=true;
    pendingState=(job!=null && Str(job,"id")==id && !delivered) || closedJobId==id?"cancelled":"";
    pendingText=pendingState=="cancelled"?"Preenchimento interrompido antes de iniciar.":"";
@@ -293,8 +297,13 @@ internal sealed class ConectaForm:Form {
   object result=new{ok=true};
   if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){
    bool available=job!=null&&!delivered&&Str(job,"id")!=cancelledJobId;
-   result=new{job=available?job:null,command=available?"open-invoice":null,cancelledJobId=cancelledJobId};
+   bool openRequested=openInvoiceUntil>DateTime.UtcNow;
+   result=new{job=available?job:null,command=available||openRequested?"open-invoice":null,openUntil=openRequested?(openInvoiceUntil-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds:0,cancelledJobId=cancelledJobId};
   }}
+  else if(parts[0]=="POST"&&parts[1]=="/opened"){
+   lock(gate){openInvoiceUntil=DateTime.MinValue;}
+   SetStatus("Extensão conectada. A etapa Pessoas da Emissão Completa está aberta.");
+  }
   else if(parts[0]=="GET"&&parts[1]=="/control"){lock(gate){result=new{jobId=job==null?"":Str(job,"id"),cancelledJobId=cancelledJobId};}}
   else if(parts[0]=="POST"&&parts[1]=="/closed"){
    var data=Parse(Encoding.UTF8.GetString(bytes));

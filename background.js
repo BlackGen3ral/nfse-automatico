@@ -88,13 +88,15 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const pending = job && /^[a-f0-9-]{36}$/.test(job.id) && Number.isFinite(job.expires) &&
       job.expires > Date.now() && control.cancelledJobId !== job.id &&
       !(await chrome.storage.session.get("nfseRemoteJob:" + job.id))["nfseRemoteJob:" + job.id];
-    if (message.bridgeKey || (!state && pending && (!owner || owner.until <= Date.now() || owner.tabId === sender.tab.id))) {
+    const openRequested = control.command === "open-invoice" && Number.isFinite(control.openUntil) && control.openUntil > Date.now();
+    if (message.bridgeKey || (!state && (pending || openRequested) && (!owner || owner.until <= Date.now() || owner.tabId === sender.tab.id))) {
       state = {until:Math.min(job?.expires || Infinity, Date.now() + 9*60*1000)};
       await chrome.storage.session.set({[key]:state,[ownerKey]:{tabId:sender.tab.id,until:state.until}});
     }
-    const active = !!state && state.until > Date.now() && (pending || !control.cancelledJobId);
-    return {active,command:active && pending && (control.command === "open-invoice" || control.command === undefined) ? "open-invoice" : null};
-  })();  task.then(respond, () => respond({ active: false }));
+    const active = !!state && state.until > Date.now() && (pending || openRequested || !control.cancelledJobId);
+    return {active,command:active && (openRequested || pending && (control.command === "open-invoice" || control.command === undefined)) ? "open-invoice" : null};
+  })();
+  task.then(respond, () => respond({active:false,error:"Não consegui falar com o app do PC. Confira se ele está conectado e clique em Abrir Emissão Completa no Chrome."}));
   return true;
 });
 async function localRequest(path, token, data) {
@@ -156,6 +158,7 @@ async function connectRemote(message, sender) {
   if (!/^[a-f0-9]{64}$/.test(bridgeKey)) return {ok:true,connected:false};
   await chrome.storage.local.set({nfseBridgeKey:bridgeKey});
   const response = await localRequest("/job", bridgeKey);
+  await localRequest("/opened",bridgeKey,{});
   const job = response.job;
   if (!job) return {ok:true,connected:true};
   if (!/^[a-f0-9-]{36}$/.test(job.id) || job.expires <= Date.now() || remoteInFlight.has(job.id)) return {ok:false};

@@ -33,6 +33,7 @@ async function portal(path, active, hash = "", delayed = false, command = "open-
     },
     history: { replaceState() { actions.push("clear-hash"); } },
     document: {
+      getElementById() { return {textContent:""}; },
       querySelector() { return linkReady ? certificate : null; },
       querySelectorAll() { return [people]; },
     },
