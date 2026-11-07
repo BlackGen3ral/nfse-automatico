@@ -56,6 +56,7 @@ async function portal(path, active, hash = "", delayed = false, command = "open-
 }
 test("Entrada autorizada segue certificado, Pessoas e conexão sem repetir cliques", async () => {
   assert.deepEqual(await portal("/EmissorNacional/Login", true, "#nfse-connect=" + "a".repeat(64)), ["clear-hash", "certificate"]);
+  assert.deepEqual(await portal("/EmissorNacional/Login", true, "#nfse-connect=" + "a".repeat(64) + "&port=17847"), ["clear-hash", "certificate"]);
   assert.deepEqual(await portal("/EmissorNacional/", true), ["people"]);
   assert.deepEqual(await portal("/EmissorNacional/Dashboard", true), ["people"]);
   assert((await portal("/EmissorNacional/DPS/Pessoas", true)).includes("nfse:connect-pc"));

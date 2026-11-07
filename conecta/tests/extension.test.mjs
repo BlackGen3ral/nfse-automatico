@@ -116,6 +116,11 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   cancelledJobId = second.id;
   assert.equal((await send({type:"nfse:remote-control"})).stopped,true);
   assert.equal(session["nfseFlow:5"].phase,"cancelled");
+  const beforePortChange=fetches.length;
+  assert.equal((await send({type:"nfse:portal-entry",bridgeKey:bridge,bridgePort:443})).active,false);
+  assert.equal(fetches.length,beforePortChange);
+  await send({type:"nfse:portal-entry",bridgeKey:bridge,bridgePort:17847});
+  assert(fetches.at(-1).url.startsWith("http://127.0.0.1:17847/"));
   assert(fetches.some(f=>f.url.endsWith("/cancel-ack") && f.data.id===second.id));
   await send({type:"nfse:update",state:{phase:"service",until:Date.now()+10000}});
   assert.equal(session["nfseFlow:5"].phase,"cancelled");

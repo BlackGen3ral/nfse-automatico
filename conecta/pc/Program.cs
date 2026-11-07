@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.4.0";
+ public const string CurrentVersion="1.4.1";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -65,6 +65,7 @@ internal sealed class ConectaForm:Form {
  Button pair,open,updates;
  CheckBox startup;
  TcpListener listener;
+ int bridgePort=17846;
  readonly bool background;
  static string Str(Dictionary<string,object> data,string key){return data.ContainsKey(key)&&data[key]!=null?Convert.ToString(data[key]):"";}
  static string Json(object value){return new JavaScriptSerializer().Serialize(value);}
@@ -137,10 +138,16 @@ internal sealed class ConectaForm:Form {
    if(!Convert.ToBoolean(pairingState["paired"]) && Str(pairingState,"pairCode")=="" && !Convert.ToBoolean(pairingState["activeJob"]))await Pair();
    lastId=Str(config,"lastJob");
    if(lastId!="")try{await Api("/api/pc/progress",new{id=lastId,state="error",message="O programa do PC foi reiniciado. Confira o portal antes de enviar novamente."},true);}catch{}
-   listener=new TcpListener(IPAddress.Loopback,17846);listener.Start();RunBackground(() => { AcceptLoop(); return Task.FromResult(0); });
+   for(int port=17846;port<=17861;port++) {
+    var candidate=new TcpListener(IPAddress.Loopback,port);
+    try{candidate.Start();listener=candidate;bridgePort=port;break;}
+    catch(SocketException error){candidate.Stop();if(error.SocketErrorCode!=SocketError.AddressAlreadyInUse)throw;}
+   }
+   if(listener==null)throw new SocketException((int)SocketError.AddressAlreadyInUse);
+   RunBackground(() => { AcceptLoop(); return Task.FromResult(0); });
    SetStatus(Convert.ToBoolean(pairingState["paired"])?"Celular conectado. Você já pode preparar uma nota.":"Conectado. Use Ler QR code do PC no celular para parear.");RunBackground(PollLoop);
    await CheckUpdates(false);
-  }catch(Exception error){if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
+  }catch(Exception error){try{File.WriteAllText(Path.Combine(Program.Folder,"connection-error.txt"),Program.CurrentVersion+" "+DateTime.UtcNow.ToString("O")+Environment.NewLine+error);}catch{}if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:error is SocketException?"Não foi possível abrir a conexão local. Feche outras instâncias do Conecta e tente novamente.":"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
   finally{initializing=false;pair.Enabled=true;if(listener==null)pair.Text="Tentar novamente";}
  }
  void RunBackground(Func<Task> action) {
@@ -186,7 +193,7 @@ internal sealed class ConectaForm:Form {
    SetStatus("A conexão com o navegador ainda não está pronta.");
    return;
   }
-  var url="https://certificado.nfse.gov.br/EmissorNacional/Certificado#nfse-connect="+bridgeKey;
+  var url="https://certificado.nfse.gov.br/EmissorNacional/Certificado#nfse-connect="+bridgeKey+"&port="+bridgePort;
   var chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome))chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome)){SetStatus("Instale o Google Chrome e a extensão NFS-e Automático para continuar.");return;}

@@ -1001,7 +1001,7 @@
 // Portal certificate entry
 (() => {
   if (location.origin !== "https://www.nfse.gov.br") return;
-  const match = location.hash.match(/^#nfse-connect=([a-f0-9]{64})$/);
+  const match = location.hash.match(/^#nfse-connect=([a-f0-9]{64})(?:&port=(\d{5}))?$/);
   let bridgeKey = match?.[1];
   if (match) history.replaceState(null, "", location.pathname + location.search);
   let checking = false;
@@ -1011,7 +1011,7 @@
     try {
       const state = await chrome.runtime.sendMessage({
         type: "nfse:portal-entry",
-        ...(bridgeKey ? { bridgeKey } : {}),
+        ...(bridgeKey ? { bridgeKey, bridgePort: match[2] ? Number(match[2]) : 17846 } : {}),
       });
       bridgeKey = null;
       if (!state?.active) return;

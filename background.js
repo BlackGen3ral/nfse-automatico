@@ -78,7 +78,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const owner = (await chrome.storage.session.get(ownerKey))[ownerKey];
     const bridgeKey = message.bridgeKey || (await chrome.storage.local.get("nfseBridgeKey")).nfseBridgeKey;
     if (!/^[a-f0-9]{64}$/.test(bridgeKey)) return {active:false};
-    if (message.bridgeKey) await chrome.storage.local.set({nfseBridgeKey:bridgeKey});
+    if (message.bridgeKey) {
+      const port = message.bridgePort === undefined ? 17846 : message.bridgePort;
+      if (!Number.isInteger(port) || port < 17846 || port > 17861) return {active:false};
+      await chrome.storage.local.set({nfseBridgeKey:bridgeKey,nfseBridgePort:port});
+    }
     const control = await localRequest("/job", bridgeKey);
     const job = control.job;
     const pending = job && /^[a-f0-9-]{36}$/.test(job.id) && Number.isFinite(job.expires) &&
@@ -94,7 +98,9 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
   return true;
 });
 async function localRequest(path, token, data) {
-  const response = await fetch("http://127.0.0.1:17846" + path, {
+  const {nfseBridgePort} = await chrome.storage.local.get("nfseBridgePort");
+  const port = Number.isInteger(nfseBridgePort) && nfseBridgePort >= 17846 && nfseBridgePort <= 17861 ? nfseBridgePort : 17846;
+  const response = await fetch("http://127.0.0.1:" + port + path, {
     method: data ? "POST" : "GET",
     headers: { authorization: "Bearer " + token, ...(data ? {"content-type":"application/json"} : {}) },
     ...(data ? {body:JSON.stringify(data)} : {}),

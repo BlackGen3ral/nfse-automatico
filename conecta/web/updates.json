@@ -1,8 +1,8 @@
 {
   "pc": {
-    "version": "1.4.0",
+    "version": "1.4.1",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Conecta-PC.exe",
-    "sha256": "9da55d8f6828a4611b95b51492a41f7e80804c9ab3f04637e631942676142080",
+    "sha256": "3ff67ea39b69356aa5bea6a7a911aeb0457b9372ab3625f9a172b83a8eb31ae1",
     "available": true
   },
   "android": {
@@ -12,8 +12,8 @@
     "versionCode": 4
   },
   "extension": {
-    "version": "0.5.4",
+    "version": "0.5.5",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Automatico.zip",
-    "sha256": "40e53fc91e9ed545be659bc9ecd3173fdf2bdee6ad43122de2bcfb15e4264f40"
+    "sha256": "502eafdc564e7480fcebc3c551a3e1f02bcfac31e35af2ebb9a3ba6abdfcee46"
   }
 }
