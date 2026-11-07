@@ -39,7 +39,7 @@ function render() {
   $("invoice-panel").hidden = !pairing;
   $("send").disabled = !online || busy;
   for (const id of ["cnpj", "description", "amount", "suspended"])
-    $(id).disabled = busy;
+    if ($(id).disabled !== busy) $(id).disabled = busy;
   if (pairing) $("computer-name").textContent = pairing.name;
 }
 function saveDraft() {

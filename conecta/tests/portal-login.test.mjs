@@ -8,9 +8,11 @@ const content = fs.readFileSync(
   "utf8",
 );
 const source = content.slice(content.indexOf("// Portal certificate entry"));
-async function portal(path, active, hash = "") {
+async function portal(path, active, hash = "", delayed = false) {
   const actions = [];
   const events = {};
+  const timers = [];
+  let linkReady = !delayed;
   const certificate = {
     dataset: {},
     click() { actions.push("certificate"); },
@@ -22,6 +24,8 @@ async function portal(path, active, hash = "") {
   };
   vm.runInNewContext(source, {
     URL,
+    setInterval(fn) { timers.push(fn); return timers.length; },
+    clearInterval() {},
     location: {
       origin: "https://www.nfse.gov.br",
       pathname: path, search: "", hash,
@@ -29,7 +33,7 @@ async function portal(path, active, hash = "") {
     },
     history: { replaceState() { actions.push("clear-hash"); } },
     document: {
-      querySelector() { return certificate; },
+      querySelector() { return linkReady ? certificate : null; },
       querySelectorAll() { return [people]; },
     },
     window: { addEventListener(name, fn) { events[name] = fn; } },
@@ -42,6 +46,11 @@ async function portal(path, active, hash = "") {
     } },
   });
   await new Promise(setImmediate);
+  if (delayed) {
+    linkReady = true;
+    timers[0]();
+    await new Promise(setImmediate);
+  }
   await events.pageshow();
   return actions;
 }
@@ -55,4 +64,7 @@ test("Navegação exige solicitação ativa e preserva as etapas em andamento", 
   assert.deepEqual(await portal("/EmissorNacional/", false), []);
   for (const step of ["Servico", "Tributacao", "Revisao"])
     assert.deepEqual(await portal("/EmissorNacional/DPS/" + step, true), []);
+});
+test("Acesso por certificado aguarda o botão aparecer", async () => {
+  assert.deepEqual(await portal("/EmissorNacional/Login", true, "", true), ["certificate"]);
 });

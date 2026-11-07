@@ -996,4 +996,10 @@
   }
   continueEntry();
   window.addEventListener("pageshow", continueEntry);
+  let entryAttempts = 0;
+  const entryTimer = setInterval(() => {
+    if (++entryAttempts >= 20) clearInterval(entryTimer);
+    continueEntry();
+  }, 1500);
+  window.addEventListener("pagehide", () => clearInterval(entryTimer), {once:true});
 })();

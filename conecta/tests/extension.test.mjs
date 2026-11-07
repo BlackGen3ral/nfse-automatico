@@ -26,6 +26,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
     },
   };
   const bridge = "a".repeat(64);
+  let pendingJob = null;
   const chrome = {
     runtime: { onMessage: { addListener: (f) => listeners.push(f) } },
     storage: { local: storage(local), session: storage(session) },
@@ -43,7 +44,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
     fetches.push({ url, data: options.body ? JSON.parse(options.body) : null });
     return {
       ok: true,
-      json: async () => (url.endsWith("/job") ? { job } : { ok: true }),
+      json: async () => (url.endsWith("/job") ? { job: pendingJob } : { ok: true }),
     };
   };
   vm.runInNewContext(
@@ -68,7 +69,10 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
       if (!handled) reject(Error("Mensagem sem receptor"));
     });
   sender.url = "https://www.nfse.gov.br/EmissorNacional/Login";
-  assert.equal((await send({ type: "nfse:portal-entry", bridgeKey: bridge })).active, true);
+  local.nfseBridgeKey = bridge;
+  assert.equal((await send({ type: "nfse:portal-entry" })).active, false);
+  pendingJob = job;
+  assert.equal((await send({ type: "nfse:portal-entry" })).active, true);
   sender.url = "https://www.nfse.gov.br/EmissorNacional/";
   assert.equal((await send({ type: "nfse:portal-entry" })).active, true);
   session["nfsePortal:5"].until = Date.now() - 1;
