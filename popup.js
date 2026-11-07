@@ -16,6 +16,54 @@ let draftKey;
 let refreshSequence = 0;
 const savedCnpjsKey = "nfseSavedCnpjs";
 let savedCnpjs = [], savedWriting = false;
+const savedPicker = document.getElementById("saved-cnpjs");
+const savedSearch = document.getElementById("search-cnpj");
+const savedOpener = document.getElementById("open-cnpjs");
+const pickerOpen = () => savedPicker.matches(":popover-open");
+function closeSavedPicker() { if (pickerOpen()) savedPicker.hidePopover(); }
+function positionSavedPicker() {
+  if (!pickerOpen()) return;
+  const rect = input.getBoundingClientRect();
+  const above = rect.top - 16, below = innerHeight - rect.bottom - 16;
+  const showAbove = above >= 160 || above >= below;
+  savedPicker.style.width = Math.min(Math.max(rect.width, 240), 340, innerWidth - 16) + "px";
+  savedPicker.style.maxHeight = Math.max(100, Math.min(320, showAbove ? above : below)) + "px";
+  savedPicker.style.left = Math.max(8, Math.min(rect.left, innerWidth - savedPicker.offsetWidth - 8)) + "px";
+  savedPicker.style.top = Math.max(8, showAbove ? rect.top - savedPicker.offsetHeight - 8 : rect.bottom + 8) + "px";
+}
+function openSavedPicker(focusSearch = false) {
+  if (input.disabled || savedWriting) return;
+  if (!pickerOpen()) {
+    savedSearch.value = "";
+    renderSavedCnpjs();
+    savedPicker.showPopover();
+  }
+  positionSavedPicker();
+  if (focusSearch) savedSearch.focus({preventScroll:true});
+}
+input.addEventListener("click", () => openSavedPicker());
+input.addEventListener("keydown", event => {
+  if (event.key === "ArrowDown" && !event.isComposing) { event.preventDefault(); openSavedPicker(true); }
+});
+savedOpener.onclick = () => openSavedPicker(true);
+document.getElementById("close-cnpjs").onclick = () => { closeSavedPicker(); input.focus({preventScroll:true}); };
+savedSearch.addEventListener("input", renderSavedCnpjs);
+savedSearch.addEventListener("keydown", event => {
+  if (event.isComposing) return;
+  if (event.key === "Enter") { event.preventDefault(); savedPicker.querySelector(".choose-cnpj:not(:disabled)")?.click(); }
+  if (event.key === "ArrowDown") { event.preventDefault(); savedPicker.querySelector(".choose-cnpj:not(:disabled)")?.focus(); }
+  if (event.key === "Escape") { event.preventDefault(); closeSavedPicker(); input.focus({preventScroll:true}); }
+});
+savedPicker.addEventListener("toggle", () => {
+  const expanded = String(pickerOpen());
+  input.setAttribute("aria-expanded", expanded);
+  savedOpener.setAttribute("aria-expanded", expanded);
+});
+document.addEventListener("focus", event => {
+  if (event.target !== input && event.target !== savedOpener && !savedPicker.contains(event.target)) closeSavedPicker();
+}, true);
+window.addEventListener("resize", positionSavedPicker);
+document.querySelector("main").addEventListener("scroll", closeSavedPicker, {passive:true});
 function cleanSavedCnpjs(value) {
   return [...new Set((Array.isArray(value) ? value : []).filter(cnpj => typeof cnpj === "string" && /^\d{14}$/.test(cnpj)))];
 }
@@ -31,11 +79,18 @@ function renderSavedCnpjs() {
   const save = document.getElementById("save-cnpj");
   save.disabled = blocked || digits(input.value).length !== 14 || saved;
   save.textContent = saved ? "✓ Salvo" : "＋ Salvar";
-  document.getElementById("saved-cnpjs").hidden = !savedCnpjs.length;
+  savedOpener.disabled = blocked;
+  if (input.disabled) closeSavedPicker();
   document.getElementById("saved-cnpj-count").textContent = String(savedCnpjs.length);
   const list = document.getElementById("saved-cnpj-list");
   list.replaceChildren();
-  for (const cnpj of savedCnpjs) {
+  const query = savedSearch.value.trim();
+  const searchDigits = query.replace(/\D/g, "");
+  const matches = savedCnpjs.filter(cnpj => !query || (searchDigits && cnpj.includes(searchDigits)));
+  const empty = document.getElementById("saved-cnpj-empty");
+  empty.hidden = !!matches.length;
+  empty.textContent = savedCnpjs.length ? "Nenhum CNPJ encontrado." : "Salve um CNPJ pelo botão ＋ Salvar para encontrá-lo aqui.";
+  for (const cnpj of matches) {
     const item = document.createElement("li");
     const choose = document.createElement("button");
     choose.type = "button";
@@ -46,6 +101,7 @@ function renderSavedCnpjs() {
     choose.onclick = () => {
       if (input.disabled || savedWriting) return;
       input.value = mask(cnpj);
+      closeSavedPicker();
       onDraftEdit();
       description.focus();
     };
@@ -59,6 +115,7 @@ function renderSavedCnpjs() {
     item.append(choose, remove);
     list.append(item);
   }
+  positionSavedPicker();
 }
 async function changeSavedCnpjs(cnpj, remove = false) {
   if (input.disabled || savedWriting || !/^\d{14}$/.test(cnpj)) return;

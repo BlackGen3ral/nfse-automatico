@@ -21,10 +21,10 @@
         <div class="form-intro"><h2>Dados da nota</h2><span id="portal-state" class="portal-state">Aguardando portal</span></div>
         <div class="customer-fields">
         <div class="label-row"><label for="cnpj">CNPJ do tomador</label><button id="save-cnpj" type="button" disabled>＋ Salvar</button></div>
-        <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="00.000.000/0000-00" required aria-describedby="hint">
+        <div class="cnpj-picker"><input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="00.000.000/0000-00" required aria-describedby="hint" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false"><button id="open-cnpjs" type="button" aria-label="Pesquisar CNPJs salvos" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false">⌄</button></div>
         <p id="hint">Também usado para o destinatário quando necessário.</p>
         <p id="saved-cnpj-status" class="saved-message" role="status" hidden></p>
-        <details id="saved-cnpjs" hidden open><summary>CNPJs salvos <span id="saved-cnpj-count"></span></summary><ul id="saved-cnpj-list" aria-label="Escolher um CNPJ salvo"></ul><p>Salvos somente neste navegador.</p></details>
+        <section id="saved-cnpjs" popover="auto" role="dialog" aria-label="Pesquisar CNPJs salvos"><div class="saved-picker-heading"><strong>CNPJs salvos <span id="saved-cnpj-count"></span></strong><button id="close-cnpjs" type="button" aria-label="Fechar CNPJs salvos">×</button></div><label for="search-cnpj">Pesquisar CNPJ</label><input id="search-cnpj" type="search" inputmode="numeric" autocomplete="off" placeholder="Digite parte do CNPJ…"><ul id="saved-cnpj-list" aria-label="Escolher um CNPJ salvo"></ul><p id="saved-cnpj-empty" role="status" hidden></p><p>Salvos somente neste navegador.</p></section>
         </div>
         <div class="description-fields">
         <div class="label-row"><label for="description">Descrição do Serviço/Fornecimento</label><span id="count" aria-hidden="true">0/2000</span></div>
