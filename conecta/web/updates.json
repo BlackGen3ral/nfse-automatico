@@ -1,0 +1,18 @@
+{
+  "pc": {
+    "version": "1.0.0",
+    "url": "https://nfse-conecta.arthurgabrielfera.workers.dev/downloads/NFSe-Conecta-PC.exe",
+    "sha256": "2a0fa264203ccfbfac9912806a8a3cd9b72772914470bb0257ed367109f99e6b"
+  },
+  "android": {
+    "version": "1.0.0",
+    "url": "https://nfse-conecta.arthurgabrielfera.workers.dev/downloads/NFSe-Conecta.apk",
+    "sha256": "6426636f959f41b6aa5175e054f0cfff4ac67372a7d3dbcb931fb49b6d66977e",
+    "versionCode": 1
+  },
+  "extension": {
+    "version": "0.5.0",
+    "url": "https://nfse-conecta.arthurgabrielfera.workers.dev/downloads/NFSe-Automatico.zip",
+    "sha256": "1c870bf286342515c6502f7a7ed934440c2f995731f335390bbe20e8884dfa96"
+  }
+}

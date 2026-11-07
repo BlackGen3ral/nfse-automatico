@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="utf-8" />
+    <meta
+      name="viewport"
+      content="width=device-width,initial-scale=1,viewport-fit=cover"
+    />
+    <meta name="theme-color" content="#13834e" />
+    <title>NFS-e Conecta</title>
+    <link rel="icon" href="/icon.svg" />
+    <link rel="stylesheet" href="/style.css" />
+    <script src="/app.js" defer></script>
+  </head>
+  <body class="app-body">
+    <header class="app-nav">
+      <a class="brand" href="/"
+        ><img src="/icon.svg" width="34" height="34" alt="" />NFS-e
+        <span>Conecta</span></a
+      ><span class="pill">ANDROID + PC</span>
+    </header>
+    <main class="app-shell">
+      <section id="pair-panel">
+        <p class="eyebrow">SEU COMPUTADOR, CONECTADO</p>
+        <h1>Vamos conectar?</h1>
+        <p class="muted">
+          Abra o programa NFS-e Conecta no PC e digite o código de pareamento
+          que aparece nele.
+        </p>
+        <form id="pair-form" class="app-card">
+          <label for="pair-code">Código do computador</label
+          ><input
+            id="pair-code"
+            placeholder="12 caracteres"
+            maxlength="12"
+            autocomplete="off"
+            autocapitalize="characters"
+            required
+          /><button class="button" id="pair-button">
+            Conectar computador →
+          </button>
+        </form>
+        <p class="fine">
+          O código expira em 5 minutos.
+          <a href="/#downloads">Baixar o programa do PC</a>
+        </p>
+      </section>
+      <section id="invoice-panel" hidden>
+        <div class="computer-bar">
+          <div>
+            <span class="eyebrow">COMPUTADOR PAREADO</span>
+            <h2 id="computer-name">Meu computador</h2>
+          </div>
+          <span id="online" class="pill">Verificando</span>
+        </div>
+        <form id="invoice-form" class="app-card">
+          <div class="form-heading">
+            <h1>Nova nota</h1>
+            <span class="muted">Até a revisão</span>
+          </div>
+          <label for="cnpj">CNPJ do tomador</label
+          ><input
+            id="cnpj"
+            placeholder="00.000.000/0000-00"
+            inputmode="numeric"
+            maxlength="18"
+            autocomplete="off"
+            required
+          /><label for="description">Descrição do serviço</label
+          ><textarea
+            id="description"
+            placeholder="Descreva o serviço prestado"
+            maxlength="2000"
+            rows="5"
+            required
+          ></textarea
+          ><label for="amount">Valor do serviço</label>
+          <div class="currency">
+            <span>R$</span
+            ><input
+              id="amount"
+              placeholder="0,00"
+              inputmode="decimal"
+              maxlength="18"
+              required
+            />
+          </div>
+          <label class="check"
+            ><input id="suspended" type="checkbox" /> Exigibilidade do ISSQN
+            suspensa</label
+          >
+          <p class="fine">Deixe desmarcado para informar “Não”.</p>
+          <button id="send" class="button">
+            Preencher no PC <span>→</span>
+          </button>
+        </form>
+        <section class="app-card progress" id="progress" hidden>
+          <span class="eyebrow">ANDAMENTO</span>
+          <h2 id="progress-title"></h2>
+          <p id="progress-message"></p>
+          <div id="step-track" class="step-track">
+            <span>Pessoas</span><span>Serviço</span><span>Valores</span
+            ><span>Revisão</span>
+          </div>
+          <button id="new-note" class="button secondary" hidden>
+            Preparar outra nota
+          </button>
+        </section>
+        <div class="app-links">
+          <a href="/">Central de downloads</a
+          ><button class="text-link" id="disconnect" type="button">
+            Desconectar
+          </button>
+        </div>
+      </section>
+      <p id="feedback" role="status" aria-live="polite"></p>
+    </main>
+  </body>
+</html>

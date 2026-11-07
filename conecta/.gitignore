@@ -1,0 +1,14 @@
+node_modules/
+.cloudflare/
+.openai/
+toolchain/
+work/
+dist/
+downloads/
+android/build/
+server/assets.js
+*.keystore
+*.p12
+*.key
+*.secret
+*.log
