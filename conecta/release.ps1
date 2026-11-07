@@ -10,7 +10,7 @@ Get-ChildItem (Join-Path $extensionRoot 'atualizador') -File -Filter '*.ps1' | C
 Compress-Archive -Path $package -DestinationPath downloads/NFSe-Automatico.zip -Force
 node prepare-updates.mjs
 node build.mjs
-node --test tests/api.test.mjs tests/extension.test.mjs
+node --test tests/api.test.mjs tests/extension.test.mjs tests/portal-login.test.mjs
 if($LASTEXITCODE -ne 0){throw 'Falha nos testes'}
 node build-worker.mjs
 if($LASTEXITCODE -ne 0){throw 'Falha no pacote Cloudflare'}

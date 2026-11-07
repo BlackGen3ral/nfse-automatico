@@ -1,4 +1,5 @@
 (() => {
+  if (!/^\/EmissorNacional\/DPS\//i.test(location.pathname)) return;
   const DIGITS = (value) => (value || "").replace(/\D/g, "");
   const norm = (value) => (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
   let running = false;
@@ -935,13 +936,6 @@
   });
   window.addEventListener("pageshow", () => resume().catch(() => {}));
   resume().catch(() => {});
-  const remoteMatch = location.hash.match(/^#nfse-connect=([a-f0-9]{64})$/);
-  if (remoteMatch && peoplePath.test(location.pathname)) {
-    history.replaceState(null, "", location.pathname + location.search);
-    chrome.runtime.sendMessage({type:"nfse:connect-pc",bridgeKey:remoteMatch[1]}).then((reply)=>{
-      if (!reply?.ok) guide.show("error",reply?.error || "Confira a conexão com o NFS-e Conecta no PC.");
-    }).catch(()=>guide.show("error","Não foi possível conectar ao programa do PC."));
-  }
   let connectingPC = false;
   async function reconnectPC() {
     if (!peoplePath.test(location.pathname) || document.hidden || running || connectingPC) return;
@@ -954,5 +948,52 @@
   window.addEventListener("pageshow", reconnectPC);
   document.addEventListener("visibilitychange", reconnectPC);
   setInterval(reconnectPC, 5000);
-  if (!remoteMatch) reconnectPC();
+  reconnectPC();
+})();
+
+// Portal certificate entry
+(() => {
+  if (location.origin !== "https://www.nfse.gov.br") return;
+  const match = location.hash.match(/^#nfse-connect=([a-f0-9]{64})$/);
+  let bridgeKey = match?.[1];
+  if (match) history.replaceState(null, "", location.pathname + location.search);
+  let checking = false;
+  async function continueEntry() {
+    if (checking) return;
+    checking = true;
+    try {
+      const state = await chrome.runtime.sendMessage({
+        type: "nfse:portal-entry",
+        ...(bridgeKey ? { bridgeKey } : {}),
+      });
+      bridgeKey = null;
+      if (!state?.active) return;
+      const path = location.pathname.replace(/\/$/, "");
+      if (/^\/EmissorNacional\/DPS\/Pessoas$/i.test(path)) {
+        await chrome.runtime.sendMessage({ type: "nfse:connect-pc" });
+        return;
+      }
+      if (/^\/EmissorNacional\/Login$/i.test(path)) {
+        const link = document.querySelector('a[href="https://certificado.nfse.gov.br/EmissorNacional/Certificado"]');
+        if (link && !link.dataset.nfseOpening) {
+          link.dataset.nfseOpening = "true";
+          link.click();
+        }
+        return;
+      }
+      if (!/^\/EmissorNacional(?:\/Home(?:\/Index)?)?$/i.test(path)) return;
+      const peopleLink = Array.from(document.querySelectorAll("a[href]")).find((link) => {
+        const url = new URL(link.href, location.href);
+        return url.origin === location.origin &&
+          /^\/EmissorNacional\/DPS\/Pessoas\/?$/i.test(url.pathname);
+      });
+      if (peopleLink && !peopleLink.dataset.nfseOpening) {
+        peopleLink.dataset.nfseOpening = "true";
+        peopleLink.click();
+      }
+    } catch {}
+    finally { checking = false; }
+  }
+  continueEntry();
+  window.addEventListener("pageshow", continueEntry);
 })();

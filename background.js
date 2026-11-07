@@ -57,6 +57,24 @@ chrome.tabs.onRemoved.addListener(async (id) => {
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error("Não foi possível configurar o painel NFS-e", error));
 
 const remoteInFlight = new Set();
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message.type !== "nfse:portal-entry" || sender.tab?.id == null) return;
+  const url = new URL(sender.url);
+  if (url.origin !== "https://www.nfse.gov.br" ||
+      !/^\/EmissorNacional(?:\/|$)/i.test(url.pathname)) return;
+  const task = (async () => {
+    const key = "nfsePortal:" + sender.tab.id;
+    let state = (await chrome.storage.session.get(key))[key];
+    if (/^[a-f0-9]{64}$/.test(message.bridgeKey)) {
+      await chrome.storage.local.set({ nfseBridgeKey: message.bridgeKey });
+      state = { until: Date.now() + 9 * 60 * 1000 };
+      await chrome.storage.session.set({ [key]: state });
+    }
+    return { active: !!state && state.until > Date.now() };
+  })();
+  task.then(respond, () => respond({ active: false }));
+  return true;
+});
 async function localRequest(path, token, data) {
   const response = await fetch("http://127.0.0.1:17846" + path, {
     method: data ? "POST" : "GET",
@@ -93,6 +111,7 @@ async function connectRemote(message, sender) {
     await chrome.storage.session.set({[ledger]:true,["nfseRemote:"+sender.tab.id]:{jobId:job.id}});
     await localRequest("/ack", bridgeKey, {id:job.id});
     const reply = await chrome.tabs.sendMessage(sender.tab.id,{type:"nfse:start",cnpj:job.invoice?.cnpj,invoice:job.invoice});
+    if (reply?.ok) await chrome.storage.session.remove("nfsePortal:" + sender.tab.id);
     if (!reply?.ok) await remoteProgress(sender.tab.id,"error",reply?.error || "Abra Pessoas no portal e confira a sessão antes de enviar outra solicitação.");
     return {ok:!!reply?.ok};
   } catch (error) {

@@ -6,12 +6,12 @@ Site e API públicos em https://nfse-conecta.pages.dev. Cada computador possui u
 
 ## Distribuição Windows
 
-O executável 1.1.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
+O executável 1.2.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
 
 ## Instalação
 
 1. No Windows, execute o programa e mantenha-o aberto. Quando uma versão estiver liberada, o executável roda da pasta onde foi salvo e continua na área perto do relógio quando a janela é fechada. O início com o Windows é opcional, pela caixa da interface.
-2. Instale a extensão 0.5.1 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
+2. Instale a extensão 0.5.2 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
 3. No Android, instale o APK e leia o QR do PC com a câmera do celular, ou digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. Gerar outro código revoga o celular anterior.
 4. Informe CNPJ, descrição e valor no Android. O computador precisa estar ligado e conectado. Certificado, PIN, login e CAPTCHA são tratados no computador. O usuário confere e confirma a emissão no portal.
 
@@ -43,3 +43,9 @@ Foram verificados compilação Windows, assinatura do APK, testes de fila/paream
 A política de execução da sessão de desenvolvimento bloqueou abrir o executável Windows. A execução real do programa com Chrome e o teste no aparelho Android ainda precisam ser realizados pelo usuário. Nenhuma nota real foi emitida nos testes.
 
 O endereço Pages usa uma Function com o binding ORIGIN apontando para o Worker nfse-conecta. As próximas publicações do Worker chegam também ao endereço Pages. O Worker mantém o banco e a rotina de expiração existentes.
+
+## Entrada por certificado
+
+No Windows 1.2.0, Configurar certificado seleciona um certificado instalado e cria uma regra AutoSelectCertificateForUrls para certificado.nfse.gov.br no Chrome. O Windows pode solicitar elevação para gravar a regra. A escolha permanece local. Após uma solicitação, a extensão 0.5.2 mantém a intenção por guia por até 9 minutos, abre o acesso por certificado na tela de login e segue para Pessoas ao chegar à página inicial. O preenchimento requer uma solicitação pendente válida. PINs de tokens continuam sujeitos à confirmação local.
+
+Os testes automatizados cobrem login, navegação, expiração por guia e entrega única. O teste completo com a política aplicada e o certificado real no Chrome ainda precisa de validação.

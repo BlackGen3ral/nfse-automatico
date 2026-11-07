@@ -19,11 +19,16 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.1.0";
+ public const string CurrentVersion="1.2.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
   Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+  if(Array.IndexOf(args,"--configure-certificate")>=0) {
+   try{CertificatePolicy.Configure(null);}
+   catch(Exception error){MessageBox.Show(error.Message,"Configuração do certificado",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+   return;
+  }
   bool created; using(var mutex=new Mutex(false,"Local\\NFSeConecta-"+Environment.UserName,out created)) {
    bool acquired; try { acquired=mutex.WaitOne(0); } catch(AbandonedMutexException) { acquired=true; }
    if(!acquired){MessageBox.Show("O NFS-e Conecta já está aberto. Procure o ícone perto do relógio do Windows.","NFS-e Conecta");return;}
@@ -68,6 +73,17 @@ internal sealed class ConectaForm:Form {
   pair=Button("Gerar novo QR code",518);pair.Click+=async delegate{try{await Pair();}catch(Exception){SetStatus("Não foi possível gerar o código. Confira a conexão.");}};
   open=Button("Abrir portal e conectar extensão",568);open.Click+=delegate{OpenPortal();};
   updates=Button("Verificar atualizações",618);updates.Click+=async delegate{await CheckUpdates(true);};
+  updates.Width=200;
+  var certificate=Button("Configurar certificado",618);
+  certificate.Location=new Point(240,618);certificate.Width=210;
+  certificate.Click+=delegate{
+   try{CertificatePolicy.Configure(this);}
+   catch(UnauthorizedAccessException){
+    try{Process.Start(new ProcessStartInfo(Application.ExecutablePath,"--configure-certificate"){UseShellExecute=true,Verb="runas"});}
+    catch(System.ComponentModel.Win32Exception){SetStatus("A configuração do certificado precisa da autorização do Windows.");}
+   }
+   catch(Exception error){MessageBox.Show(this,error.Message,"Configuração do certificado",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
+  };
   startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,674)};Controls.Add(startup);
   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){startup.Checked=key!=null&&key.GetValue("NFSeConecta")!=null;}
   startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
@@ -130,7 +146,7 @@ internal sealed class ConectaForm:Form {
    SetStatus("A conexão com o navegador ainda não está pronta.");
    return;
   }
-  var url="https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas#nfse-connect="+bridgeKey;
+  var url="https://www.nfse.gov.br/EmissorNacional/#nfse-connect="+bridgeKey;
   var chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome))chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome)){SetStatus("Instale o Google Chrome e a extensão NFS-e Automático para continuar.");return;}
@@ -161,7 +177,7 @@ internal sealed class ConectaForm:Form {
     }
    }
    if(accept) {
-    SetStatus("Solicitação recebida. Abrindo o portal. Se aparecer login ou certificado, conclua no PC e use Abrir portal.");
+    SetStatus("Solicitação recebida. Entrando no portal com certificado e preparando a etapa Pessoas. Se o certificado pedir PIN, confirme no PC.");
     BeginInvoke(new Action(OpenPortal));
    } else {
     await Api("/api/pc/progress",new{id=id,state="error",message="Uma execução anterior foi interrompida. Confira o PC antes de enviar novamente."},true);

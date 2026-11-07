@@ -67,7 +67,19 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
       }
       if (!handled) reject(Error("Mensagem sem receptor"));
     });
-  assert((await send({ type: "nfse:connect-pc", bridgeKey: bridge })).ok);
+  sender.url = "https://www.nfse.gov.br/EmissorNacional/Login";
+  assert.equal((await send({ type: "nfse:portal-entry", bridgeKey: bridge })).active, true);
+  sender.url = "https://www.nfse.gov.br/EmissorNacional/";
+  assert.equal((await send({ type: "nfse:portal-entry" })).active, true);
+  session["nfsePortal:5"].until = Date.now() - 1;
+  assert.equal((await send({ type: "nfse:portal-entry" })).active, false);
+  assert.equal((await send({ type: "nfse:portal-entry", bridgeKey: bridge })).active, true);
+  sender.tab.id = 6;
+  assert.equal((await send({ type: "nfse:portal-entry" })).active, false);
+  sender.tab.id = 5;
+  sender.url = "https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas?idr=teste";
+  assert((await send({ type: "nfse:connect-pc" })).ok);
+  assert.equal(session["nfsePortal:5"], undefined);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].cnpj, job.invoice.cnpj);
   await send({ type: "nfse:connect-pc" });
