@@ -70,6 +70,11 @@ function renderButton() {
   const inService = serviceUrl.test(tab?.url || "");
   const inValues = valuesUrl.test(tab?.url || "");
   const withoutCnpj = inService || inValues;
+  const portalOpen = peopleUrl.test(tab?.url || "") || withoutCnpj;
+  const portalState = document.getElementById("portal-state");
+  portalState.textContent = portalOpen ? "Portal aberto" : "Aguardando portal";
+  portalState.dataset.open = String(portalOpen);
+  document.getElementById("workspace-title").textContent = inValues ? "Confira os valores." : inService ? "Continue no serviço." : "Sua próxima nota.";
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
   if (busy || starting) document.querySelector("#fill-label").textContent = starting ? "Preparando sua nota…" : "Preenchendo nota…";
@@ -113,6 +118,11 @@ function saveDraft() {
 function onDraftEdit() {
   renderButton();
   saveDraft();
+  if (!initializing && !busy && !starting && peopleUrl.test(tab?.url || "") && status.dataset.error !== "true") {
+    show(digits(input.value).length === 14 && invoiceData()
+      ? "Tudo pronto. Vamos preparar sua nota?"
+      : "Informe o CNPJ, a descrição e o valor para começar.");
+  }
 }
 input.addEventListener("input", () => {
   input.value = mask(digits(input.value));

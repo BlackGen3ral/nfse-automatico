@@ -6,7 +6,7 @@ Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacion
 
 Use **Entrar com certificado** para ir direto ao acesso por certificado digital do Emissor Nacional. Se o navegador apresentar a lista de certificados ou solicitar o PIN, conclua essa etapa na janela do navegador.
 
-O ícone da extensão abre um painel na lateral do Chrome, ao lado do site. Ele permanece aberto quando você clica na página. Use o X para fechar. Ao confirmar Preencher até a revisão, a lateral fecha após o portal confirmar o início. Cada guia mantém seu próprio rascunho. Requer Chrome 141 ou posterior.
+O ícone da extensão abre um painel na lateral do Chrome, ao lado do site. A interface usa branco, tons neutros e verde, com etapas conectadas, identificação da guia do portal e botão principal sempre visível. Os campos se reorganizam em duas colunas quando há largura disponível, com rolagem vertical em painéis estreitos. Ele permanece aberto quando você clica na página. Use o X para fechar. Ao confirmar Preencher até a revisão, a lateral fecha após o portal confirmar o início. Cada guia mantém seu próprio rascunho. Requer Chrome 141 ou posterior.
 
 O painel guarda um rascunho na sessão do navegador enquanto você digita. Se ele fechar ao trocar de janela ou minimizar o Chrome, abra a extensão na mesma guia para continuar. O rascunho é removido ao avançar para Serviço, fechar a guia ou encerrar a sessão do navegador.
 
