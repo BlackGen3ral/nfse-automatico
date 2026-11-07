@@ -1,6 +1,6 @@
 # NFS-e Automático
 
-Durante o preenchimento, a página recebe um escurecimento suave de 20%, com uma abertura iluminada no campo em uso. O efeito não bloqueia cliques e termina ao concluir ou ocorrer um erro. Uma seta ilustrativa com contorno claro e brilho verde acompanha os campos acionados. A interface usa branco e verde vivo. O assistente se reconecta se o portal remover seu cartão durante uma atualização da página; ele permanece durante pesquisas e esperas, e encerra no resultado final. Um robô animado com um pequeno notebook acompanha o preenchimento no canto da página, indicando quando está trabalhando, aguardando o portal ou tentando recuperar uma pesquisa. Pulsos verdes indicam valores confirmados nos controles. Ao chegar à revisão ou ocorrer um erro, o robô dá lugar ao cartão de resultado, com mensagens distintas e contagem de 10 segundos para fechar. Você também pode fechá-lo pelo X. A emissão continua manual no portal.
+Durante o preenchimento, a página recebe um escurecimento suave de 20%, com uma abertura iluminada no campo em uso. O efeito não bloqueia cliques e termina ao concluir ou ocorrer um erro. Uma seta ilustrativa com contorno claro e brilho verde acompanha os campos acionados. A interface usa branco e verde vivo. O assistente se reconecta se o portal remover seu cartão durante uma atualização da página; ele permanece durante pesquisas e esperas, e encerra no resultado final. Um robô animado com uma varinha e pequenas estrelas acompanha o preenchimento no canto da página, indicando quando está trabalhando, aguardando o portal ou tentando recuperar uma pesquisa. Pulsos verdes indicam valores confirmados nos controles. Ao chegar à revisão, o robô mostra o resultado com contagem de 10 segundos para fechar. Avisos de erro permanecem visíveis até serem fechados. Você também pode fechá-lo pelo X. A emissão continua manual no portal.
 
 Extensão Manifest V3 para Chrome e Edge. Na etapa **Pessoas** do Emissor Nacional, abra a extensão e informe **CNPJ do tomador**, **Descrição do Serviço/Fornecimento** e **Valor do serviço**. Clique em **Preencher até a revisão**. O mesmo CNPJ é usado para o destinatário quando o campo estiver disponível e o perfil indicar que o destinatário é informado separadamente.
 
@@ -19,6 +19,10 @@ Em um rascunho aberto diretamente em **Serviço** ou **Valores**, os botões des
 O andamento aparece na página do portal. Se algum campo ou pesquisa não puder ser confirmado, a extensão indica o que ficou pendente. A descrição e o valor são repassados entre etapas pelo armazenamento de sessão do navegador.
 
 A extensão lê as exceções da etapa Pessoas quando o CNPJ do emitente corresponde a um perfil local. O CNPJ digitado no painel substitui os CNPJs cadastrados naquela execução. O número vai ao Emissor Nacional pela pesquisa do próprio portal. O atualizador consulta apenas os arquivos públicos do GitHub.
+
+## Conferência e diagnóstico
+
+A extensão relê os campos que alterou antes de avançar. Se uma seleção, resposta ou valor tiver sido perdido pelo portal, ela interrompe a etapa e indica a pendência. O painel lateral mantém a lista de campos conferidos por etapa, sem registrar seus valores no histórico. O autodiagnóstico diferencia falta de internet, sessão expirada, verificação manual, avisos de validação e indisponibilidade do portal. As conferências verificam o preenchimento, não validam o enquadramento fiscal ou os cálculos do portal. A emissão continua manual.
 
 ## Instalação
 

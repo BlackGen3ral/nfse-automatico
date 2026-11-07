@@ -188,5 +188,7 @@ h1 { overflow-wrap: anywhere; }
 @keyframes fill-launch { from { transform:translateX(-110%); } to { transform:translateX(110%); } }
 
 .amount-field:focus-within > span { border-color:#28a565; background:#e8f8ed; }
+#audit-review{margin:16px 0;padding:14px 16px;border:1px solid #cce7d7;border-radius:12px;background:#f7fcf9;color:#245e45;font-size:12px;overflow-wrap:anywhere}
+#audit-review[hidden]{display:none}#audit-review summary{cursor:pointer;font-weight:650}#audit-review p{line-height:1.6;margin:12px 0 0}
 .amount-field input:focus { box-shadow:2px 0 0 2px #31b97313; }
 @media (max-width:340px) { h2 { font-size:17px; gap:6px; } .field-total { padding:3px 5px; letter-spacing:.03em; } }

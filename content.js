@@ -3,6 +3,39 @@
   const DIGITS = (value) => (value || "").replace(/\D/g, "");
   const norm = (value) => (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
   let running = false;
+  const confirmations = new Map();
+  let audit = [];
+  const stageName = () => peoplePath.test(location.pathname) ? "Pessoas" : servicePath.test(location.pathname) ? "Serviço" : "Valores";
+  function remember(field, expected) {
+    if (!field) return;
+    const names = {Prestador_Inscricao:"CNPJ do emitente",Prestador_Nome:"Dados do emitente",Tomador_Inscricao:"CNPJ do tomador",Destinatario_Inscricao:"CNPJ do destinatário",DataCompetencia:"Data de competência",LocalPrestacao_CodigoPaisPrestacao:"País da prestação",LocalPrestacao_CodigoMunicipioPrestacao:"Município da prestação",ServicoPrestado_CodigoTributacaoNacional:"Código de Tributação Nacional",ServicoPrestado_CodigoNBS:"Item NBS",ServicoPrestado_CodigoIndOp:"Indicador da operação",ServicoPrestado_Descricao:"Descrição do serviço",Valores_ValorServico:"Valor do serviço",ValorTributos_AliquotaSN:"Alíquota do Simples Nacional",TributacaoFederal_PISCofins_SituacaoTributaria:"Situação do PIS/COFINS",TributacaoFederal_PISCofins_TipoRetencao:"Retenção do PIS/COFINS/CSLL",ValorTributos_CodigoSituacaoTributaria:"Situação tributária IBS/CBS",ValorTributos_CodigoClassificacaoTributaria:"Classificação tributária IBS/CBS"};
+    const label = names[field.id] || Array.from(field.labels || []).map(item => item.textContent.trim()).find(Boolean) ||
+      field.id || field.name || "Campo preenchido";
+    const key = field.type === "radio" ? field.name || field.id : field.id || field.name;
+    if (!key) return;
+    confirmations.set(key, { label, check: () => {
+      const current = field.id ? document.getElementById(field.id) : field;
+      return !!current && (field.type === "radio" ? current.checked : /Inscricao/.test(key) ? DIGITS(current.value) === DIGITS(String(expected)) : String(current.value) === String(expected));
+    }});
+  }
+  async function conferStage() {
+    ensureRunning();
+    const health = portalHealth();
+    if (health) throw portalFailure("Conferência antes de avançar");
+    const checks = Array.from(confirmations.values());
+    const failed = checks.filter(item => !item.check());
+    if (failed.length) throw new Error("O portal alterou ou não manteve: " + failed.map(item => item.label).join(" · "));
+    audit = audit.filter(item => item.stage !== stageName());
+    audit.push({stage: stageName(), count: checks.length, fields: checks.map(item => item.label.slice(0, 120)), confirmedAt: Date.now()});
+    guide.wait("Conferência concluída · " + checks.length + " campos mantidos pelo portal");
+  }
+  function reviewExplanation(records) {
+    const confirmed = ["Pessoas", "Serviço", "Valores"].map(stage => records?.find(item => item.stage === stage));
+    if (confirmed.some(item => !item || !Number.isInteger(item.count) || item.count < 1))
+      return "Você chegou à revisão, mas o histórico de conferência está incompleto. Confira todos os dados no portal antes de emitir.";
+    return confirmed.map(item => item.stage + ": " + item.count + " campos conferidos").join(" · ") +
+      ". As seleções foram relidas antes de cada avanço. Confira o resumo e os cálculos do portal; a emissão continua com você.";
+  }
   let stopped = false, activeRemoteJobId = null;
   function ensureRunning() {
     if (stopped) { const error = new Error("Preenchimento interrompido."); error.name = "AbortError"; throw error; }
@@ -51,7 +84,7 @@
     ensureRunning();
     if (!element || element.disabled) return false;
     const next = String(value);
-    if (element.value === next) return true;
+    if (element.value === next) { remember(element, next); return true; }
     guide.point(element);
     const setter = Object.getOwnPropertyDescriptor(Object.getPrototypeOf(element), "value")?.set;
     if (setter) setter.call(element, next);
@@ -59,7 +92,7 @@
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
     element.dispatchEvent(new Event("blur", { bubbles: true }));
-    if (element.value === next) guide.confirm(element);
+    if (element.value === next) { remember(element, next); guide.confirm(element); }
     return true;
   }
 
@@ -78,7 +111,7 @@
           : text.replace(/^\d+ /, "") === norm(wanted) || text.startsWith(norm(wanted) + " ")));
     });
     if (!option) return false;
-    if (element.value === option.value) return true;
+    if (element.value === option.value) { remember(element, option.value); return true; }
     if (element.disabled) return false;
     guide.point(element, true);
     const chosen = document.getElementById(element.id + "_chosen");
@@ -94,7 +127,7 @@
       guide.point(result, true);
       result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
       guide.point(opener);
-      if (element.value === option.value) guide.confirm(opener);
+      if (element.value === option.value) { remember(element, option.value); guide.confirm(opener); }
       return element.value === option.value;
     }
     return setNativeValue(element, option.value) && element.value === option.value;
@@ -131,7 +164,7 @@
       const widget = selection();
       return field() && !field().disabled && visible(widget) && widget;
     }, 12000);
-    if (selected()) return;
+    if (selected()) { remember(field(), field().value); return; }
     guide.point(control, true);
     if (control.getAttribute("aria-expanded") !== "true") {
       pressWidgetKey(control, "Enter", 13);
@@ -160,6 +193,7 @@
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
         guide.point(control);
         await waitFor(label + " · seleção", selected);
+        remember(field(), field().value);
         guide.confirm(control);
         return;
       }
@@ -193,7 +227,7 @@
   function chooseRadio(scope, optionText, group) {
     ensureRunning();
     const radio = findRadio(scope, optionText, group);
-    if (!radio || radio.disabled) return !!radio?.checked;
+    if (!radio || radio.disabled) { if (radio?.checked) remember(radio, true); return !!radio?.checked; }
     if (!radio.checked) {
       guide.point(radio, true);
       const label = Array.from(radio.labels || []).find((item) =>
@@ -201,7 +235,7 @@
       label?.click();
     }
     if (!radio.checked) radio.click();
-    if (radio.checked) guide.confirm(radio);
+    if (radio.checked) { remember(radio, true); guide.confirm(radio); }
     return radio.checked;
   }
 
@@ -309,6 +343,16 @@
         .card[data-mood=error]{border-color:#e9c07d}.card[data-mood=error] .message{background:#fff8ed}
         .worker{z-index:1;box-shadow:0 8px 24px #1d683224}
         .worker strong:before{content:"";display:inline-block;width:6px;height:6px;margin-right:6px;border-radius:50%;background:#20a963;box-shadow:0 0 0 3px #dff7e8}
+        .worker .workstation{display:none}
+        .worker .hand{animation:cast-spell 1.5s ease-in-out infinite}
+        .worker .hand:before{content:"";position:absolute;width:4px;height:32px;left:2px;bottom:7px;border-radius:3px;background:linear-gradient(#f6fff9 0 24%,#25845a 24% 80%,#c5f6d6 80%);box-shadow:0 0 7px #53d99680;transform:rotate(24deg);transform-origin:bottom}
+        .worker .hand:after{content:"✦";position:absolute;left:9px;top:-30px;font-size:21px;color:#37bc75;text-shadow:0 0 12px #6be8a0;animation:magic-spark 1.5s ease-in-out infinite}
+        .worker-avatar:after{content:"✧  ·  ✦";position:absolute;left:8px;top:0;color:#299e62;font-size:17px;pointer-events:none;animation:magic-spark 2s ease-in-out infinite reverse}
+        .worker[data-waiting=true] .hand{animation-duration:3s}
+        .target:after{content:"✦";position:absolute;right:-13px;top:-16px;color:#20a765;font-size:22px;text-shadow:0 0 12px #7af4b3;animation:magic-spark 1.4s ease-in-out infinite}
+        @keyframes cast-spell{0%,100%{transform:rotate(-40deg)}50%{transform:rotate(-95deg)}}
+        @keyframes magic-spark{0%,100%{opacity:.2;transform:translateY(3px) scale(.75)}50%{opacity:1;transform:translateY(-4px) scale(1.08)}}
+        @media(prefers-reduced-motion:reduce){.worker .hand,.worker .hand:after,.worker-avatar:after,.target:after{animation:none!important}}
       </style>
       <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
       <div class="target" aria-hidden="true"></div>
@@ -420,7 +464,7 @@
         const countdown = root.querySelector(".dismiss-countdown");
         const closeAt = Date.now() + 10000;
         countdown.textContent = "Fechando em 10 s…";
-        dismissTimer = setInterval(() => {
+        dismissTimer = next === "error" ? null : setInterval(() => {
           if (phase !== next) return;
           const seconds = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000));
           if (!seconds) {
@@ -429,13 +473,14 @@
             host.remove(); clearTarget();
           } else countdown.textContent = "Fechando em " + seconds + " s…";
         }, 1000);
+        if (next === "error") countdown.textContent = "O preenchimento foi pausado. Nenhuma nota foi emitida pelo robô.";
         const stage = next === "error" ? "error" : next === "review-ready" ? "review" : String(index);
         if (lastStage !== null && stage !== lastStage && !reduced()) {
           message.animate?.([{opacity:.3,transform:"translateY(4px)"},{opacity:1,transform:"translateY(0)"}],{duration:240,easing:"ease-out"});
         }
         lastStage = stage;
         card.dataset.mood = next === "error" ? "error" : next === "review-ready" ? "review" : "working";
-        title.textContent = next === "error" ? "Ficou algo pendente" : next === "review-ready" ? "Deu tudo certo! Agora é com você." : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
+        title.textContent = next === "error" ? "Ficou algo pendente" : next === "review-ready" ? "Agora é com você!" : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
         card.querySelectorAll("li").forEach((item,i) => {
           item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
           item.querySelector("span").textContent = i < index ? "✓" : String(i+1);
@@ -495,7 +540,7 @@
     return chrome.runtime.sendMessage({
       type: "nfse:update",
       state: {
-        phase, text, valuesDraft, invoice, invoiceDraft, retryStep, visualDraft: draftId(),
+        phase, text, valuesDraft, invoice, invoiceDraft, retryStep, audit, visualDraft: draftId(),
         until: Date.now() + (valuesDraft || retryStep || invoice ? 1800000 : 120000)
       }
     });
@@ -544,6 +589,7 @@
   }
 
   function portalHealth() {
+    if (typeof navigator !== "undefined" && navigator.onLine === false) return {kind:"offline", message:"Este computador está sem conexão. Reconecte a internet antes de retomar."};
     const alerts = Array.from(document.querySelectorAll(".alert-danger,.alert-warning,.validation-summary-errors li,.field-validation-error"))
       .filter(visible).map((item) => (item.innerText || item.textContent || "").trim()).filter(Boolean);
     const text = alerts.join(" · ").slice(0, 300);
@@ -591,7 +637,7 @@
       if (Date.now() - checkedAt >= 400) {
         checkedAt = Date.now();
         const health = portalHealth();
-        if (health && ["session", "captcha"].includes(health.kind)) throw portalFailure(label);
+        if (health && ["session", "captcha", "offline"].includes(health.kind)) throw portalFailure(label);
       }
       const result = predicate();
       if (result) { if (waitingShown) guide.restore(); return result; }
@@ -616,7 +662,12 @@
   }
 
   function applyRadio(scope, label, option) {
-    return waitFor(label, () => chooseRadio(scope(), option));
+    return waitFor(label, () => chooseRadio(scope(), option)).then(result => {
+      const radio = findRadio(scope(), option);
+      const confirmation = confirmations.get(radio?.name || radio?.id);
+      if (confirmation) confirmation.label = label + ": " + option;
+      return result;
+    });
   }
 
   function dateValue(field) {
@@ -658,6 +709,8 @@
         (previousCnpj === cnpj || nameWasCleared || name !== previousName);
     }, 12000);
     });
+    confirmations.set(stem + "_consulta", {label: label + " · dados pesquisados", check: () =>
+      DIGITS(field()?.value) === cnpj && !!lookupName(scope(), stem)});
   }
 
   async function prepareIssuer() {
@@ -682,6 +735,10 @@
       date.dispatchEvent(new Event("change", { bubbles: true }));
     }
     await waitFor("O portal não carregou os dados do emitente. Confira o cadastro ou tente novamente em instantes", ready, 15000);
+    remember(date, dateValue(date));
+    const issuer = document.getElementById("Prestador_Inscricao");
+    const issuerName = document.getElementById("Prestador_Nome");
+    remember(issuer, issuer.value); remember(issuerName, issuerName.value);
   }
 
   async function fillPeople(cnpj, invoice) {
@@ -722,7 +779,8 @@
       throw new Error(validationMessage(form, "Pessoas"));
     }
 
-    const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…", {
+    await conferStage();
+    const armed = await update("waiting", "Pessoas conferida. Abrindo a etapa Serviço…", {
       invoice, invoiceDraft: draftId()
     });
     if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
@@ -769,6 +827,7 @@
     if (issues.length) throw new Error(issues.join(" · "));
     const draft = draftId();
     if (!invoice) {
+      await conferStage();
       await update("done", "Serviço preenchido. Complete a descrição e avance quando estiver pronto.", { valuesDraft: draft });
       return;
     }
@@ -779,6 +838,7 @@
     });
     if (!draft) throw new Error("Rascunho da etapa Serviço");
     const next = advanceButton("ServicoPrestado_Descricao", servicePath, "Serviço");
+    await conferStage();
     const armed = await update("done", "Serviço preenchido. Abrindo Valores…", { valuesDraft: draft, invoice });
     if (!armed || !servicePath.test(location.pathname)) throw new Error("Transição para Valores");
     watchAdvance(servicePath, next, "Serviço", invoice);
@@ -839,6 +899,7 @@
 
     if (issues.length) throw new Error(issues.join(" · "));
     if (!invoice) {
+      await conferStage();
       await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
       return;
     }
@@ -852,6 +913,7 @@
       if (missing) throw new Error("Preencha os dados da suspensão da exigibilidade do ISSQN");
     }
     const next = advanceButton("Valores_ValorServico", valuesPath, "Valores");
+    await conferStage();
     const armed = await update("review", "Preenchimento concluído. Revise a nota e decida quando emitir.");
     if (!armed || !valuesPath.test(location.pathname)) throw new Error("Transição para revisão");
     watchAdvance(valuesPath, next, "Valores", invoice);
@@ -861,7 +923,8 @@
     if (stopped || error.name === "AbortError") return Promise.resolve(null);
     const draft = invoice && draftId();
     const health = portalHealth();
-    const detail = health?.message || error.message;
+    const advice = {offline:"Confira a conexão do computador.", session:"Entre novamente e retome o mesmo rascunho.", captcha:"Conclua a verificação manualmente.", transient:"O portal está indisponível. Tente novamente nesta etapa.", validation:"Confira os campos destacados pelo portal."};
+    const detail = (health?.message || error.message) + (health ? " Diagnóstico: " + advice[health.kind] : " Confira o campo indicado e tente novamente nesta etapa.");
     return update("error", "Não consegui concluir. " + detail, draft ? {
       invoice, invoiceDraft: draft, retryStep: peoplePath.test(location.pathname) ? "people" : valuesPath.test(location.pathname) ? "values" : "service"
     } : {});
@@ -872,13 +935,15 @@
     const inValues = valuesPath.test(location.pathname);
     if (!inValues && !servicePath.test(location.pathname)) return;
     const health = portalHealth();
-    if (health && ["session", "captcha"].includes(health.kind)) throw portalFailure("Retomada");
+    if (health && ["session", "captcha", "offline"].includes(health.kind)) throw portalFailure("Retomada");
     const state = await chrome.runtime.sendMessage({type:"nfse:status"});
     if (state?.phase !== "error" || state.until <= Date.now() || !draftId() || state.visualDraft !== draftId() ||
         (state.invoice && (state.invoiceDraft !== draftId() || !validInvoice(state.invoice)))) {
       throw new Error("Abra o painel da extensão para iniciar nesta nota. Não há uma recuperação válida para este rascunho.");
     }
     const invoice = state.invoice || null;
+    audit = Array.isArray(state.audit) ? state.audit : [];
+    confirmations.clear();
     running = true;
     try { await (inValues ? fillValues(invoice) : fillService(invoice)); }
     catch (error) { await report(error, invoice); }
@@ -894,7 +959,7 @@
       const state = await chrome.runtime.sendMessage({type:"nfse:status"});
       if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
           state.visualDraft === draftId() && !document.querySelector("input[type=password]")) {
-        guide.show("review-ready", "Preenchimento concluído. Confira os dados e confirme a emissão no portal.");
+        guide.show("review-ready", reviewExplanation(state.audit));
         chrome.runtime.sendMessage({type:"nfse:remote-result"}).catch(()=>{});
       }
       return;
@@ -908,6 +973,7 @@
       if (flow?.recovered && !validInvoice(flow.invoice)) throw new Error("Os dados guardados não permitem retomar este rascunho. Abra o painel da extensão.");
       if (flow?.recovered) showStatus(inValues ? "values" : "service", "Retomando o mesmo rascunho após a interrupção…");
       invoice = validInvoice(flow?.invoice) ? flow.invoice : null;
+      audit = Array.isArray(flow?.audit) ? flow.audit : [];
       if (flow) await (inValues ? fillValues(invoice) : fillService(invoice));
       else {
         const state = await chrome.runtime.sendMessage({type:"nfse:status"});
@@ -945,6 +1011,8 @@
       (async () => {
         await chrome.runtime.sendMessage({type:"nfse:manual-begin"});
         const state = await chrome.runtime.sendMessage({ type: "nfse:status" });
+        confirmations.clear();
+        audit = state?.visualDraft === draftId() && Array.isArray(state.audit) ? state.audit : [];
         if (state?.until > Date.now() && state.retryStep === (inValues ? "values" : "service") &&
             state.invoiceDraft === draftId() && validInvoice(state.invoice)) invoice = state.invoice;
         await (inValues ? fillValues(invoice) : fillService(invoice));
@@ -958,6 +1026,7 @@
     }
     running = true;
     stopped = false; activeRemoteJobId = message.jobId || null;
+    confirmations.clear(); audit = [];
     let replied = false;
     (async () => {
       if (message.jobId) await checkRemoteControl();

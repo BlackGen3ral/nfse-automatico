@@ -153,6 +153,15 @@ async function refresh() {
   const flow = (await chrome.storage.session.get(key))[key];
   if (sequence !== refreshSequence) return;
   const current = flow?.until > Date.now() ? flow : null;
+  const auditReview = document.getElementById("audit-review");
+  auditReview.hidden = !current?.audit?.length;
+  const auditContent = document.getElementById("audit-content");
+  auditContent.replaceChildren();
+  for (const record of current?.audit || []) {
+    const entry = document.createElement("p");
+    entry.textContent = record.stage + " · " + record.count + " campos confirmados antes de avançar. " + (record.fields || []).join(" · ");
+    auditContent.append(entry);
+  }
   const inService = serviceUrl.test(tab?.url || "");
   const inValues = valuesUrl.test(tab?.url || "");
   busy = !!current && (["people", "waiting", "service", "values"].includes(current.phase) ||
