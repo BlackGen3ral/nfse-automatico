@@ -16,3 +16,7 @@ foreach($name in @('build-tools;35.0.0','platforms;android-35')){
  & 'C:/Program Files/7-Zip/7z.exe' x $zip ('-o'+(Join-Path $root 'sdk')) -y | Out-Null
 }
 Write-Output 'Ferramentas Android prontas.'
+
+New-Item -ItemType Directory -Force -Path (Join-Path $root 'roslyn') | Out-Null
+Invoke-WebRequest 'https://api.nuget.org/v3-flatcontainer/microsoft.net.compilers.toolset/4.8.0/microsoft.net.compilers.toolset.4.8.0.nupkg' -OutFile (Join-Path $root 'roslyn/compiler.zip')
+Expand-Archive -LiteralPath (Join-Path $root 'roslyn/compiler.zip') -DestinationPath (Join-Path $root 'roslyn') -Force

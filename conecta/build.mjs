@@ -30,6 +30,7 @@ for (const name of fs.readdirSync("web")) {
   };
 }
 files["/app"] = files["/app.html"];
+files["/.well-known/assetlinks.json"] = files["/assetlinks.json"];
 if (fs.existsSync("downloads"))
   for (const name of downloads.filter(name => fs.existsSync("downloads/" + name)))
     files["/downloads/" + name] = {

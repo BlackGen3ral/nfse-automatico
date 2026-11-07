@@ -9,6 +9,7 @@ using System.Net.Sockets;
 using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
+using System.Text.RegularExpressions;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Web.Script.Serialization;
@@ -18,8 +19,8 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.0.1";
- public const string Site="https://nfse-conecta.arthurgabrielfera.workers.dev";
+ public const string CurrentVersion="1.1.0";
+ public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
   Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
@@ -32,7 +33,7 @@ internal static class Program {
  }
 }
 internal sealed class ConectaForm:Form {
- readonly HttpClient http=new HttpClient(){Timeout=TimeSpan.FromSeconds(15)};
+ readonly HttpClient http=new HttpClient(new HttpClientHandler { AllowAutoRedirect=false }) { Timeout=TimeSpan.FromSeconds(15) };
  readonly object gate=new object();
  readonly SemaphoreSlim executionGate=new SemaphoreSlim(1,1);
  Dictionary<string,object> config=new Dictionary<string,object>();
@@ -43,6 +44,9 @@ internal sealed class ConectaForm:Form {
  DateTime jobStarted;
  NotifyIcon tray;
  Label status,code;
+ PictureBox pairingQr;
+ DateTime qrExpires;
+ System.Windows.Forms.Timer qrTimer;
  Button pair,open,updates;
  CheckBox startup;
  TcpListener listener;
@@ -52,20 +56,25 @@ internal sealed class ConectaForm:Form {
  static Dictionary<string,object> Parse(string value){return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(value);}
  static string RandomKey(){var b=new byte[32];using(var rng=RandomNumberGenerator.Create())rng.GetBytes(b);return BitConverter.ToString(b).Replace("-","").ToLowerInvariant();}
  public ConectaForm(bool hidden){
-  background=hidden;Text="NFS-e Conecta";ClientSize=new Size(480,510);MinimumSize=new Size(470,540);BackColor=Color.FromArgb(245,251,247);Font=new Font("Segoe UI",10);StartPosition=FormStartPosition.CenterScreen;
+  background=hidden;Text="NFS-e Conecta";ClientSize=new Size(480,748);MinimumSize=new Size(496,787);BackColor=Color.FromArgb(245,251,247);Font=new Font("Segoe UI",10);StartPosition=FormStartPosition.CenterScreen;
   try{using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("logo")){var bitmap=new Bitmap(s);Icon=Icon.FromHandle(bitmap.GetHicon());}}catch{}
   var heading=new Label(){Text="NFS-e Conecta",Font=new Font("Segoe UI",22,FontStyle.Bold),ForeColor=Color.FromArgb(19,111,64),AutoSize=true,Location=new Point(28,25)};Controls.Add(heading);
   Controls.Add(new Label(){Text="Seu Android conectado a este computador",AutoSize=true,Location=new Point(30,72),ForeColor=Color.FromArgb(82,113,93)});
   status=new Label(){Text="Conectando ao serviço…",Location=new Point(30,112),Size=new Size(420,58)};Controls.Add(status);
   Controls.Add(new Label(){Text="CÓDIGO DE PAREAMENTO",Font=new Font("Segoe UI",8,FontStyle.Bold),AutoSize=true,Location=new Point(30,183),ForeColor=Color.FromArgb(65,125,83)});
   code=new Label(){Text="…",Font=new Font("Consolas",25,FontStyle.Bold),Location=new Point(26,207),Size=new Size(428,48),TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.White};Controls.Add(code);
-  pair=Button("Gerar novo código",275);pair.Click+=async delegate{try{await Pair();}catch(Exception){SetStatus("Não foi possível gerar o código. Confira a conexão.");}};
-  open=Button("Abrir portal e conectar extensão",325);open.Click+=delegate{OpenPortal();};
-  updates=Button("Verificar atualizações",375);updates.Click+=async delegate{await CheckUpdates(true);};
-  startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,433)};Controls.Add(startup);
+  pairingQr=new PictureBox(){Location=new Point(134,265),Size=new Size(212,212),SizeMode=PictureBoxSizeMode.CenterImage,BackColor=Color.White};Controls.Add(pairingQr);
+  Controls.Add(new Label(){Text="Leia o QR com a câmera do celular para conectar.",AutoSize=true,Location=new Point(31,487)});
+  pair=Button("Gerar novo QR code",518);pair.Click+=async delegate{try{await Pair();}catch(Exception){SetStatus("Não foi possível gerar o código. Confira a conexão.");}};
+  open=Button("Abrir portal e conectar extensão",568);open.Click+=delegate{OpenPortal();};
+  updates=Button("Verificar atualizações",618);updates.Click+=async delegate{await CheckUpdates(true);};
+  startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,674)};Controls.Add(startup);
   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){startup.Checked=key!=null&&key.GetValue("NFSeConecta")!=null;}
   startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
-  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Ao fechar, continua perto do relógio.",AutoSize=true,Location=new Point(31,470),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
+  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Ao fechar, continua perto do relógio.",AutoSize=true,Location=new Point(31,714),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
+  qrTimer=new System.Windows.Forms.Timer(){Interval=1000};
+  qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires){pairingQr.Image.Dispose();pairingQr.Image=null;code.Text="QR expirado";}};
+  qrTimer.Start();
   tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=true};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
   FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit){e.Cancel=true;Hide();}};
   Shown+=async delegate{if(background)Hide();await Initialize();};
@@ -83,7 +92,7 @@ internal sealed class ConectaForm:Form {
  async Task Initialize(){
   try {
    var file=Path.Combine(Program.Folder,"settings.bin");if(File.Exists(file))config=Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(file),null,DataProtectionScope.CurrentUser)));
-   if(!config.ContainsKey("pcToken")){config=await Api("/api/register",new{name=Environment.MachineName},false);config["bridgeKey"]=RandomKey();Save();code.Text=Str(config,"pairCode");}
+   if(!config.ContainsKey("pcToken")){config=await Api("/api/register",new{name=Environment.MachineName},false);config["bridgeKey"]=RandomKey();Save();ShowPairCode(Str(config,"pairCode"));}
    else {code.Text="Já configurado";}
    if(!config.ContainsKey("bridgeKey")){config["bridgeKey"]=RandomKey();Save();}
    lastId=Str(config,"lastJob");
@@ -97,13 +106,39 @@ internal sealed class ConectaForm:Form {
    if(task.Exception != null) SetStatus("A conexão em segundo plano foi interrompida. Feche pelo ícone e abra novamente.");
   },TaskContinuationOptions.OnlyOnFaulted);
  }
- async Task Pair(){pair.Enabled=false;try{var data=await Api("/api/pc/pair",new{},true);code.Text=Str(data,"pairCode");SetStatus("Digite este código no Android em até 5 minutos. O pareamento anterior foi revogado.");}finally{pair.Enabled=true;}}
+ async Task Pair(){pair.Enabled=false;try{var data=await Api("/api/pc/pair",new{},true);ShowPairCode(Str(data,"pairCode"));SetStatus("Leia o QR com a câmera do celular em até 5 minutos. Gerar outro QR desconecta o pareamento anterior.");}finally{pair.Enabled=true;}}
+ void ShowPairCode(string value) {
+  code.Text=value;
+  using(var generator=new QRCoder.QRCodeGenerator())
+  using(var data=generator.CreateQrCode(Program.Site+"/app#pair="+value,QRCoder.QRCodeGenerator.ECCLevel.M)) {
+   int scale=212/data.ModuleMatrix.Count;
+   var image=new Bitmap(data.ModuleMatrix.Count*scale,data.ModuleMatrix.Count*scale);
+   using(var graphics=Graphics.FromImage(image)) {
+    graphics.Clear(Color.White);
+    for(int y=0;y<data.ModuleMatrix.Count;y++)
+     for(int x=0;x<data.ModuleMatrix.Count;x++)
+      if(data.ModuleMatrix[y][x])graphics.FillRectangle(Brushes.Black,x*scale,y*scale,scale,scale);
+   }
+   if(pairingQr.Image!=null)pairingQr.Image.Dispose();
+   pairingQr.Image=image;
+   qrExpires=DateTime.UtcNow.AddMinutes(5);
+  }
+ }
  void OpenPortal(){
-  var url="https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas#nfse-connect="+Str(config,"bridgeKey");
+  var bridgeKey=Str(config,"bridgeKey");
+  if(!Regex.IsMatch(bridgeKey,@"\A[a-f0-9]{64}\z")) {
+   SetStatus("A conexão com o navegador ainda não está pronta.");
+   return;
+  }
+  var url="https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas#nfse-connect="+bridgeKey;
   var chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome))chrome=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"Google\\Chrome\\Application\\chrome.exe");
   if(!File.Exists(chrome)){SetStatus("Instale o Google Chrome e a extensão NFS-e Automático para continuar.");return;}
-  Process.Start(new ProcessStartInfo(chrome,"--new-tab \""+url+"\""){UseShellExecute=true});
+  try {
+   Process.Start(new ProcessStartInfo(chrome,"--new-tab \""+url+"\"") { UseShellExecute=false });
+  } catch (System.ComponentModel.Win32Exception) {
+   SetStatus("Não foi possível abrir o Google Chrome.");
+  }
  }
  async Task ClaimJob() {
   await executionGate.WaitAsync();
@@ -174,7 +209,7 @@ internal sealed class ConectaForm:Form {
   var auth=map.ContainsKey("Authorization")?map["Authorization"]:"";var expected="Bearer "+Str(config,"bridgeKey");int diff=auth.Length^expected.Length;for(int i=0;i<Math.Min(auth.Length,expected.Length);i++)diff|=auth[i]^expected[i];if(diff!=0){Respond(stream,401,new{error="Não autorizado"});return;}
   int length=0;if(map.ContainsKey("Content-Length"))Int32.TryParse(map["Content-Length"],out length);if(length<0||length>16384){Respond(stream,413,new{error="Dados grandes"});return;}
   var bytes=new byte[length];int offset=0;while(offset<length){var read=stream.Read(bytes,offset,length-offset);if(read<=0)return;offset+=read;}
-  object result=new{ok=true};if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){result=new{job=job!=null&&!delivered?job:null};}}
+  object result=new{ok=true};if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){result=new{job=job!=null&&!delivered?job:null};}if(job==null)SetStatus("Extensão conectada. Você já pode enviar uma nota pelo celular.");}
   else if(parts[0]=="POST"&&(parts[1]=="/ack"||parts[1]=="/progress")){var data=Parse(Encoding.UTF8.GetString(bytes));lock(gate){if(job!=null&&Str(data,"id")==Str(job,"id")){if(parts[1]=="/ack"){delivered=true;pendingState="running";pendingText="Conferindo a sessão e os dados no portal…";}else{var phase=Str(data,"phase");pendingState=phase=="review-ready"?"review":phase=="error"?"error":"running";pendingText=Str(data,"text");}}}}
   else {Respond(stream,404,new{error="Endereço inválido"});return;}
   Respond(stream,200,result);
@@ -217,5 +252,5 @@ internal sealed class ConectaForm:Form {
    executionGate.Release();
   }
  }
- protected override void OnFormClosed(FormClosedEventArgs e){exit=true;if(listener!=null)listener.Stop();tray.Visible=false;tray.Dispose();http.Dispose();base.OnFormClosed(e);}
+ protected override void OnFormClosed(FormClosedEventArgs e){exit=true;qrTimer.Dispose();if(pairingQr.Image!=null)pairingQr.Image.Dispose();if(listener!=null)listener.Stop();tray.Visible=false;tray.Dispose();http.Dispose();base.OnFormClosed(e);}
 }

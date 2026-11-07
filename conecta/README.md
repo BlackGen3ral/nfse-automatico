@@ -2,17 +2,17 @@
 
 Primeira versão do controle Android → Windows → extensão NFS-e Automático.
 
-Site e API públicos em https://nfse-conecta.arthurgabrielfera.workers.dev. Cada computador possui uma chave própria. O celular recebe uma credencial independente ao consumir um código temporário de pareamento de 12 caracteres.
+Site e API públicos em https://nfse-conecta.pages.dev. Cada computador possui uma chave própria. O celular recebe uma credencial independente ao consumir um código temporário de pareamento de 12 caracteres.
 
-## Distribuição Windows suspensa
+## Distribuição Windows
 
-O Microsoft Defender detectou o executável 1.0.0 e a compilação revisada 1.0.1 como Trojan:Win32/Wacatac.B!ml. O download está suspenso enquanto a detecção precisa de análise. A publicação só pode voltar após validação do arquivo específico e registro do seu SHA-256 em versions.json. O script de publicação reaproveita esse arquivo validado sem recompilar o Windows.
+O executável 1.1.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
 
 ## Instalação
 
 1. No Windows, execute o programa e mantenha-o aberto. Quando uma versão estiver liberada, o executável roda da pasta onde foi salvo e continua na área perto do relógio quando a janela é fechada. O início com o Windows é opcional, pela caixa da interface.
-2. Instale a extensão 0.5.0 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
-3. No Android, instale o APK e digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. Gerar outro código revoga o celular anterior.
+2. Instale a extensão 0.5.1 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
+3. No Android, instale o APK e leia o QR do PC com a câmera do celular, ou digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. Gerar outro código revoga o celular anterior.
 4. Informe CNPJ, descrição e valor no Android. O computador precisa estar ligado e conectado. Certificado, PIN, login e CAPTCHA são tratados no computador. O usuário confere e confirma a emissão no portal.
 
 ## Atualizações
@@ -23,7 +23,7 @@ Para publicar uma melhoria, altere versions.json e as partes correspondentes, ex
 
 ## Desenvolvimento
 
-- Node.js 24, Windows com .NET Framework e ferramentas Android em toolchain são necessários para compilar todos os componentes. download-toolchain.ps1 obtém JDK e ferramentas Android das fontes oficiais. Os binários dessas ferramentas não fazem parte do pacote distribuído.
+- Node.js 24, Windows com .NET Framework, compilador Roslyn 4.8 e ferramentas Android em toolchain são necessários para compilar todos os componentes. download-toolchain.ps1 obtém JDK e ferramentas Android das fontes oficiais. Os binários dessas ferramentas não fazem parte do pacote distribuído.
 - npm ci instala as ferramentas de publicação. npm test valida a API e o repasse de comandos da extensão.
 - cloudflare.config.ts identifica o Worker e o banco D1. A configuração existente deve ser reutilizada nas atualizações.
 - prepare-schema.mjs produz um lote SQL e cf d1 query deve recebê-lo com --batch @.cloudflare/schema-batch.json. Uma instrução SQL por entrada evita aplicação parcial do esquema.
@@ -41,3 +41,5 @@ CNPJ, descrição e valor são transmitidos por HTTPS e permanecem no D1 até co
 Foram verificados compilação Windows, assinatura do APK, testes de fila/pareamento/idempotência, autenticação, integração simulada com a extensão, transições existentes da extensão e um teste HTTP real no Cloudflare, incluindo integridade dos três downloads.
 
 A política de execução da sessão de desenvolvimento bloqueou abrir o executável Windows. A execução real do programa com Chrome e o teste no aparelho Android ainda precisam ser realizados pelo usuário. Nenhuma nota real foi emitida nos testes.
+
+O endereço Pages usa uma Function com o binding ORIGIN apontando para o Worker nfse-conecta. As próximas publicações do Worker chegam também ao endereço Pages. O Worker mantém o banco e a rotina de expiração existentes.

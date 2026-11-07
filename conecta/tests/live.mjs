@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import { spawnSync } from "node:child_process";
-const origin = "https://nfse-conecta.arthurgabrielfera.workers.dev";
+const origin = "https://nfse-conecta.pages.dev";
 async function call(path, token, data) {
   const r = await fetch(origin + path, {
     method: data ? "POST" : "GET",
@@ -56,7 +56,7 @@ try {
     );
   }
   console.log(
-    "Conexão real validada: pareamento, fila única, confirmação de resultado e integridade dos downloads disponíveis e suspensão do Windows.",
+    "Conexão real validada: pareamento, fila única, confirmação de resultado e integridade dos downloads disponíveis.",
   );
 } finally {
   const batch = [

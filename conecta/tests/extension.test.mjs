@@ -50,7 +50,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
     fs.readFileSync(
       fs.existsSync("../background.js")
         ? "../background.js"
-        : "../nfse-057/background.js",
+        : "../nfse-git/background.js",
       "utf8",
     ),
     { chrome, URL, fetch, AbortSignal },
@@ -70,7 +70,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   assert((await send({ type: "nfse:connect-pc", bridgeKey: bridge })).ok);
   assert.equal(calls.length, 1);
   assert.equal(calls[0].cnpj, job.invoice.cnpj);
-  await send({ type: "nfse:connect-pc", bridgeKey: bridge });
+  await send({ type: "nfse:connect-pc" });
   assert.equal(calls.length, 1);
   await send({
     type: "nfse:update",

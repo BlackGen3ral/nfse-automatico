@@ -1,0 +1,14 @@
+[
+  {
+    "relation": [
+      "delegate_permission/common.handle_all_urls"
+    ],
+    "target": {
+      "sha256_cert_fingerprints": [
+        "DC:D4:3A:A9:E6:10:2D:37:CE:D9:BE:CF:72:18:77:06:BF:6A:FF:8E:D9:7D:95:1C:4D:17:5F:81:16:7A:F3:3C"
+      ],
+      "namespace": "android_app",
+      "package_name": "com.artho.nfseconecta"
+    }
+  }
+]

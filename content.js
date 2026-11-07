@@ -942,4 +942,17 @@
       if (!reply?.ok) guide.show("error",reply?.error || "Confira a conexão com o NFS-e Conecta no PC.");
     }).catch(()=>guide.show("error","Não foi possível conectar ao programa do PC."));
   }
+  let connectingPC = false;
+  async function reconnectPC() {
+    if (!peoplePath.test(location.pathname) || document.hidden || running || connectingPC) return;
+    connectingPC = true;
+    try {
+      await chrome.runtime.sendMessage({type:"nfse:connect-pc"});
+    } catch {}
+    finally { connectingPC = false; }
+  }
+  window.addEventListener("pageshow", reconnectPC);
+  document.addEventListener("visibilitychange", reconnectPC);
+  setInterval(reconnectPC, 5000);
+  if (!remoteMatch) reconnectPC();
 })();

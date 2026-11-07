@@ -1,6 +1,6 @@
 import fs from "node:fs";
 import crypto from "node:crypto";
-const site = "https://nfse-conecta.arthurgabrielfera.workers.dev";
+const site = "https://nfse-conecta.pages.dev";
 const extensionRoot = fs.existsSync("../manifest.json") ? ".." : "../nfse-git";
 const extensionVersion = JSON.parse(
   fs.readFileSync(extensionRoot + "/manifest.json", "utf8"),

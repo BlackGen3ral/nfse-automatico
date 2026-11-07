@@ -78,10 +78,11 @@ async function remoteProgress(tabId, phase, text) {
 }
 async function connectRemote(message, sender) {
   const url = new URL(sender.url);
-  if (url.origin !== "https://www.nfse.gov.br" || !/^\/EmissorNacional\/DPS\/Pessoas(?:\/|$)/i.test(url.pathname) || !/^[a-f0-9]{64}$/.test(message.bridgeKey)) throw new Error("Conexão inválida.");
-  const bridgeKey = message.bridgeKey;
-  const response = await localRequest("/job", bridgeKey);
+  if (url.origin !== "https://www.nfse.gov.br" || !/^\/EmissorNacional\/DPS\/Pessoas(?:\/|$)/i.test(url.pathname)) throw new Error("Conexão inválida.");
+  const bridgeKey = message.bridgeKey || (await chrome.storage.local.get("nfseBridgeKey")).nfseBridgeKey;
+  if (!/^[a-f0-9]{64}$/.test(bridgeKey)) return {ok:true,connected:false};
   await chrome.storage.local.set({nfseBridgeKey:bridgeKey});
+  const response = await localRequest("/job", bridgeKey);
   const job = response.job;
   if (!job) return {ok:true,connected:true};
   if (!/^[a-f0-9-]{36}$/.test(job.id) || job.expires <= Date.now() || remoteInFlight.has(job.id)) return {ok:false};

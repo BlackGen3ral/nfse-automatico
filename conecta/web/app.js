@@ -230,3 +230,13 @@ document.addEventListener("visibilitychange", start);
 window.addEventListener("online", start);
 render();
 start();
+const qrMatch = location.hash.match(/^#pair=([A-F0-9]{12})$/);
+if (qrMatch) {
+  history.replaceState(null, "", location.pathname);
+  if (pairing) {
+    feedback("Este celular já está conectado. Desconecte para trocar de computador.");
+  } else {
+    $("pair-code").value = qrMatch[1];
+    $("pair-form").requestSubmit();
+  }
+}
