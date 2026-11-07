@@ -14,18 +14,19 @@ const feedback = (text) => {
   $("feedback").textContent = text;
 };
 async function api(path, options = {}) {
+  const credential = pairing?.mobileToken;
   const response = await fetch(path, {
     ...options,
     headers: {
       "content-type": "application/json",
-      ...(pairing ? { authorization: "Bearer " + pairing.mobileToken } : {}),
+      ...(credential ? { authorization: "Bearer " + credential } : {}),
       ...options.headers,
     },
     cache: "no-store",
   });
   const data = await response.json();
   if (!response.ok) {
-    if (response.status === 401) {
+    if (response.status === 401 && pairing?.mobileToken === credential) {
       pairing = null;
       localStorage.removeItem("nfsePair");
       render();
@@ -38,6 +39,7 @@ function render() {
   $("pair-panel").hidden = !!pairing;
   $("invoice-panel").hidden = !pairing;
   $("send").disabled = !online || busy;
+  $("scan-qr").disabled = busy;
   for (const id of ["cnpj", "description", "amount", "suspended"])
     if ($(id).disabled !== busy) $(id).disabled = busy;
   if (pairing) $("computer-name").textContent = pairing.name;
@@ -88,6 +90,10 @@ $("pair-form").addEventListener("submit", async (event) => {
       body: JSON.stringify({ code: $("pair-code").value }),
     });
     pairing = data;
+    online = false;
+    busy = false;
+    requestId = null;
+    sessionStorage.removeItem("nfseRequest");
     localStorage.setItem("nfsePair", JSON.stringify(data));
     feedback("");
     render();
@@ -143,9 +149,11 @@ $("invoice-form").addEventListener("submit", async (event) => {
 });
 async function refresh() {
   if (!pairing || polling) return;
+  const currentPair = pairing;
   polling = true;
   try {
     const status = await api("/api/status");
+    if (pairing !== currentPair) return;
     online = status.online;
     $("online").textContent = online ? "PC conectado" : "PC desconectado";
     $("online").dataset.online = String(online);

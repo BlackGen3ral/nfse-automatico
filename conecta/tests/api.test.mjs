@@ -49,8 +49,14 @@ test("Pareamento, autenticação, fila exclusiva, entrega única e resultado", a
   const registration = await call("/api/register", null, { name: "PC teste" });
   assert.equal(registration.status, 200);
   const pc = registration.data;
+  assert.equal((await call("/api/pc/status", pc.pcToken, {})).data.pairCode, pc.pairCode);
   const mobile = (await call("/api/pair", null, { code: pc.pairCode })).data;
   assert(mobile.mobileToken);
+  assert.equal((await call("/api/pc/status", pc.pcToken, {})).data.paired, true);
+  const replacement = await call("/api/pc/pair", pc.pcToken, {});
+  assert.equal(replacement.status, 200);
+  assert.equal((await call("/api/status", mobile.mobileToken)).status, 200);
+  assert((await call("/api/pc/status", pc.pcToken, {})).data.pairCode);
   assert.equal(
     (await call("/api/pair", null, { code: pc.pairCode })).status,
     400,
@@ -78,6 +84,9 @@ test("Pareamento, autenticação, fila exclusiva, entrega única e resultado", a
     409,
   );
   const claim = await call("/api/pc/poll", pc.pcToken, {});
+  assert.equal((await call("/api/pair", null, {code:replacement.data.pairCode})).status, 409);
+  assert.equal((await call("/api/status", mobile.mobileToken)).status, 200);
+  assert.equal((await call("/api/pc/pair", pc.pcToken, {})).status, 409);
   assert.equal(claim.data.job.id, id);
   assert.equal(claim.data.job.invoice.description, invoice.description);
   assert.equal((await call("/api/pc/poll", pc.pcToken, {})).data.job, null);

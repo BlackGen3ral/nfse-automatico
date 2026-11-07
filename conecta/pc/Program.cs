@@ -19,11 +19,16 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.2.1";
+ public const string CurrentVersion="1.3.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
   Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
+  var waitIndex=Array.IndexOf(args,"--wait-for-pid");
+  int parentId;
+  if(waitIndex>=0 && waitIndex+1<args.Length && Int32.TryParse(args[waitIndex+1],out parentId)) {
+   try{if(!Process.GetProcessById(parentId).WaitForExit(30000))return;}catch(ArgumentException){}
+  }
   if(Array.IndexOf(args,"--configure-certificate")>=0) {
    try{CertificatePolicy.Configure(null);}
    catch(Exception error){MessageBox.Show(error.Message,"Configuração do certificado",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
@@ -45,10 +50,12 @@ internal sealed class ConectaForm:Form {
  Dictionary<string,object> job;
  bool delivered;
  volatile bool exit,updating;
- string lastId="",pendingState="",pendingText="",announcedVersion="";
+ string lastId="",pendingState="",pendingText="";
  DateTime jobStarted;
  NotifyIcon tray;
  Label status,code;
+ Label qrHint;
+ bool initializing;
  PictureBox pairingQr;
  DateTime qrExpires;
  System.Windows.Forms.Timer qrTimer;
@@ -67,10 +74,11 @@ internal sealed class ConectaForm:Form {
   Controls.Add(new Label(){Text="Seu Android conectado a este computador",AutoSize=true,Location=new Point(30,72),ForeColor=Color.FromArgb(82,113,93)});
   status=new Label(){Text="Conectando ao serviço…",Location=new Point(30,112),Size=new Size(420,58)};Controls.Add(status);
   Controls.Add(new Label(){Text="CÓDIGO DE PAREAMENTO",Font=new Font("Segoe UI",8,FontStyle.Bold),AutoSize=true,Location=new Point(30,183),ForeColor=Color.FromArgb(65,125,83)});
-  code=new Label(){Text="…",Font=new Font("Consolas",25,FontStyle.Bold),Location=new Point(26,207),Size=new Size(428,48),TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.White};Controls.Add(code);
+  code=new Label(){Text="Conectando…",Font=new Font("Consolas",20,FontStyle.Bold),Location=new Point(26,207),Size=new Size(428,48),TextAlign=ContentAlignment.MiddleCenter,BackColor=Color.White};Controls.Add(code);
   pairingQr=new PictureBox(){Location=new Point(134,265),Size=new Size(212,212),SizeMode=PictureBoxSizeMode.CenterImage,BackColor=Color.White};Controls.Add(pairingQr);
+  qrHint=new Label(){Text="Conferindo o pareamento…",Dock=DockStyle.Fill,TextAlign=ContentAlignment.MiddleCenter,Padding=new Padding(16),ForeColor=Color.FromArgb(65,125,83)};pairingQr.Controls.Add(qrHint);
   Controls.Add(new Label(){Text="Leia o QR com a câmera do celular para conectar.",AutoSize=true,Location=new Point(31,487)});
-  pair=Button("Gerar novo QR code",518);pair.Click+=async delegate{try{await Pair();}catch(Exception){SetStatus("Não foi possível gerar o código. Confira a conexão.");}};
+  pair=Button("Gerar novo QR code",518);pair.Enabled=false;pair.Click+=async delegate{try{if(listener==null)await Initialize();else await Pair();}catch(Exception error){SetStatus(error.Message);}};
   open=Button("Abrir portal e conectar extensão",568);open.Click+=delegate{OpenPortal();};
   updates=Button("Verificar atualizações",618);updates.Click+=async delegate{await CheckUpdates(true);};
   updates.Width=200;
@@ -87,9 +95,9 @@ internal sealed class ConectaForm:Form {
   startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,674)};Controls.Add(startup);
   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){startup.Checked=key!=null&&key.GetValue("NFSeConecta")!=null;}
   startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
-  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Ao fechar, continua perto do relógio.",AutoSize=true,Location=new Point(31,714),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
+  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Atualizações automáticas",AutoSize=true,Location=new Point(31,714),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
   qrTimer=new System.Windows.Forms.Timer(){Interval=1000};
-  qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires){pairingQr.Image.Dispose();pairingQr.Image=null;code.Text="QR expirado";}};
+  qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires)SetPairingLabel("QR expirado","Clique em Gerar novo QR code para conectar.");};
   qrTimer.Start();
   tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=true};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
   FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit){e.Cancel=true;Hide();}};
@@ -102,29 +110,58 @@ internal sealed class ConectaForm:Form {
  async Task<Dictionary<string,object>> Api(string path,object data,bool authenticated){
   using(var message=new HttpRequestMessage(HttpMethod.Post,Program.Site+path)){
    if(authenticated)message.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",Str(config,"pcToken"));
-   message.Content=new StringContent(Json(data),Encoding.UTF8,"application/json");using(var response=await http.SendAsync(message)){var parsed=Parse(await response.Content.ReadAsStringAsync());if(!response.IsSuccessStatusCode)throw new Exception("Serviço indisponível.");return parsed;}
+   message.Content=new StringContent(Json(data),Encoding.UTF8,"application/json");using(var response=await http.SendAsync(message)){var parsed=Parse(await response.Content.ReadAsStringAsync());if(!response.IsSuccessStatusCode)throw new PcApiException(response.StatusCode,Str(parsed,"error"));return parsed;}
   }
  }
  async Task Initialize(){
+  if(initializing)return;
+  initializing=true;pair.Enabled=false;
   try {
    var file=Path.Combine(Program.Folder,"settings.bin");if(File.Exists(file))config=Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(file),null,DataProtectionScope.CurrentUser)));
    if(!config.ContainsKey("pcToken")){config=await Api("/api/register",new{name=Environment.MachineName},false);config["bridgeKey"]=RandomKey();Save();ShowPairCode(Str(config,"pairCode"));}
-   else {code.Text="Já configurado";}
+   else {code.Text="Conferindo conexão…";}
    if(!config.ContainsKey("bridgeKey")){config["bridgeKey"]=RandomKey();Save();}
+   Dictionary<string,object> pairingState;
+   try{pairingState=await Api("/api/pc/status",new{},true);}
+   catch(PcApiException error) {
+    if(error.Status!=HttpStatusCode.Unauthorized)throw;
+    var bridge=Str(config,"bridgeKey");
+    config=await Api("/api/register",new{name=Environment.MachineName},false);
+    config["bridgeKey"]=bridge;Save();
+    pairingState=await Api("/api/pc/status",new{},true);
+   }
+   ApplyPairingState(pairingState);
+   if(!Convert.ToBoolean(pairingState["paired"]) && Str(pairingState,"pairCode")=="" && !Convert.ToBoolean(pairingState["activeJob"]))await Pair();
    lastId=Str(config,"lastJob");
    if(lastId!="")try{await Api("/api/pc/progress",new{id=lastId,state="error",message="O programa do PC foi reiniciado. Confira o portal antes de enviar novamente."},true);}catch{}
    listener=new TcpListener(IPAddress.Loopback,17846);listener.Start();RunBackground(() => { AcceptLoop(); return Task.FromResult(0); });
-   SetStatus("Conectado. Pareie o Android e mantenha a extensão instalada no Chrome.");RunBackground(PollLoop);
-  }catch{SetStatus("Não foi possível conectar. Confira a internet e abra novamente. Se houver outra conexão local na porta 17846, feche-a.");}
+   SetStatus(Convert.ToBoolean(pairingState["paired"])?"Celular conectado. Você já pode preparar uma nota.":"Conectado. Use Ler QR code do PC no celular para parear.");RunBackground(PollLoop);
+   await CheckUpdates(false);
+  }catch(Exception error){if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
+  finally{initializing=false;pair.Enabled=true;if(listener==null)pair.Text="Tentar novamente";}
  }
  void RunBackground(Func<Task> action) {
   Task.Run(action).ContinueWith(task => {
    if(task.Exception != null) SetStatus("A conexão em segundo plano foi interrompida. Feche pelo ícone e abra novamente.");
   },TaskContinuationOptions.OnlyOnFaulted);
  }
- async Task Pair(){pair.Enabled=false;try{var data=await Api("/api/pc/pair",new{},true);ShowPairCode(Str(data,"pairCode"));SetStatus("Leia o QR com a câmera do celular em até 5 minutos. Gerar outro QR desconecta o pareamento anterior.");}finally{pair.Enabled=true;}}
+ async Task Pair(){pair.Enabled=false;try{var data=await Api("/api/pc/pair",new{},true);ShowPairCode(Str(data,"pairCode"));SetStatus("Leia o QR em até 5 minutos. O celular atual permanece conectado até parear outro.");}finally{pair.Enabled=true;}}
+ void SetPairingLabel(string title,string hint) {
+  if(pairingQr.Image!=null){pairingQr.Image.Dispose();pairingQr.Image=null;}
+  code.Text=title;qrHint.Text=hint;qrHint.Visible=true;
+ }
+ void ApplyPairingState(Dictionary<string,object> data) {
+  if(IsDisposed||!IsHandleCreated)return;
+  if(InvokeRequired){BeginInvoke(new Action<Dictionary<string,object>>(ApplyPairingState),data);return;}
+  var value=Str(data,"pairCode");
+  if(Regex.IsMatch(value,"^[A-F0-9]{12}$")) {
+   if(code.Text!=value)ShowPairCode(value);
+  } else if(Convert.ToBoolean(data["paired"]))SetPairingLabel("Celular conectado","Pareamento ativo. Gere outro QR apenas para trocar de celular.");
+  else SetPairingLabel("Sem celular conectado","Clique em Gerar novo QR code para parear.");
+ }
  void ShowPairCode(string value) {
   code.Text=value;
+  qrHint.Visible=false;pair.Text="Gerar novo QR code";
   using(var generator=new QRCoder.QRCodeGenerator())
   using(var data=generator.CreateQrCode(Program.Site+"/app#pair="+value,QRCoder.QRCodeGenerator.ECCLevel.M)) {
    int scale=212/data.ModuleMatrix.Count;
@@ -161,6 +198,7 @@ internal sealed class ConectaForm:Form {
   try {
    if(updating || exit) return;
    var data=await Api("/api/pc/poll",new{},true);
+   ApplyPairingState(data);
    if(!data.ContainsKey("job") || data["job"]==null) return;
    var incoming=(Dictionary<string,object>)data["job"];
    var id=Str(incoming,"id");
@@ -212,7 +250,7 @@ internal sealed class ConectaForm:Form {
     }
     if(DateTime.UtcNow>=nextUpdate) {
      await CheckUpdates(false);
-     nextUpdate=DateTime.UtcNow.AddHours(1);
+     nextUpdate=DateTime.UtcNow.AddMinutes(15);
     }
    } catch { SetStatus("Reconectando ao serviço. Os dados da solicitação atual continuam preservados."); }
    await Task.Delay(3000);
@@ -252,15 +290,14 @@ internal sealed class ConectaForm:Form {
     if(manual) SetStatus("Você está usando a versão mais recente.");
     return;
    }
-   SetStatus("Versão "+latest+" disponível na central de downloads.");
-   if(manual) {
-    if(MessageBox.Show(this,"A versão "+latest+" está disponível. Abrir a central de downloads?","Atualização disponível",MessageBoxButtons.YesNo,MessageBoxIcon.Information)==DialogResult.Yes) {
-     Process.Start(new ProcessStartInfo(Program.Site+"/#downloads") {UseShellExecute=true});
-    }
-   } else if(announcedVersion!=latest && IsHandleCreated && !IsDisposed) {
-    announcedVersion=latest;
-    BeginInvoke(new Action(() => tray.ShowBalloonTip(5000,"NFS-e Conecta","Nova versão disponível. Abra o programa e clique em Verificar atualizações.",ToolTipIcon.Info)));
+   SetStatus("Baixando atualização "+latest+"…");
+   var target=await PcUpdates.Stage(http,pc,Program.Site,Program.Folder);
+   var start=new ProcessStartInfo(target,"--wait-for-pid "+Process.GetCurrentProcess().Id){UseShellExecute=false};
+   Process.Start(start);
+   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run",true)){
+    if(key!=null && key.GetValue("NFSeConecta")!=null)key.SetValue("NFSeConecta","\""+target+"\" --background");
    }
+   BeginInvoke(new Action(()=>{exit=true;Application.Exit();}));
   } catch {
    if(manual) SetStatus("Não foi possível verificar a atualização. Tente novamente mais tarde.");
   } finally {

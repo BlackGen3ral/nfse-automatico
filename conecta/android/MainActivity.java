@@ -19,7 +19,8 @@ import java.io.ByteArrayOutputStream;
 public class MainActivity extends Activity {
  private static final String ORIGIN="https://nfse-conecta.pages.dev";
  private WebView web;
- private boolean checking=false;
+ private UpdateController updates;
+ private android.webkit.PermissionRequest cameraRequest;
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
   getWindow().setStatusBarColor(Color.rgb(241,248,244));
@@ -43,6 +44,26 @@ public class MainActivity extends Activity {
    view.setPadding(bars.left,bars.top,bars.right,bars.bottom);
    return new android.view.WindowInsets.Builder(insets).setInsets(handled,android.graphics.Insets.NONE).build();
   });
+  updates=new UpdateController(this);
+  web.addJavascriptInterface(new AndroidBridge(),"NfseAndroid");
+  web.setWebChromeClient(new android.webkit.WebChromeClient(){
+   @Override public void onPermissionRequest(android.webkit.PermissionRequest request){
+    Uri origin=request.getOrigin();
+    String[] resources=request.getResources();
+    if(!"https".equals(origin.getScheme()) || !"nfse-conecta.pages.dev".equals(origin.getHost()) ||
+       (origin.getPort()!=-1 && origin.getPort()!=443) || resources.length!=1 ||
+       !android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE.equals(resources[0])){request.deny();return;}
+    if(checkSelfPermission(android.Manifest.permission.CAMERA)==android.content.pm.PackageManager.PERMISSION_GRANTED){
+     request.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});return;
+    }
+    if(cameraRequest!=null){request.deny();return;}
+    cameraRequest=request;
+    requestPermissions(new String[]{android.Manifest.permission.CAMERA},41);
+   }
+   @Override public void onPermissionRequestCanceled(android.webkit.PermissionRequest request){
+    if(cameraRequest==request)cameraRequest=null;
+   }
+  });
   web.getSettings().setJavaScriptEnabled(true);
   web.getSettings().setDomStorageEnabled(true);
   web.getSettings().setAllowFileAccess(false);
@@ -63,12 +84,16 @@ public class MainActivity extends Activity {
   });
   setContentView(root);
   if(state==null || web.restoreState(state)==null) web.loadUrl(pairingUrl(getIntent()));
-  checkUpdate();
+
  }
  private String pairingUrl(Intent intent) {
   Uri uri=intent.getData();
   if(uri!=null && "https".equals(uri.getScheme()) && "nfse-conecta.pages.dev".equals(uri.getHost()) && "/app".equals(uri.getPath()) && uri.getFragment()!=null && uri.getFragment().matches("pair=[A-F0-9]{12}")) return ORIGIN+"/app#"+uri.getFragment();
   return ORIGIN+"/app";
+ }
+ public final class AndroidBridge {
+  @android.webkit.JavascriptInterface public String version(){return updates.version();}
+  @android.webkit.JavascriptInterface public void checkUpdates(){runOnUiThread(()->updates.check(true));}
  }
  @Override protected void onNewIntent(Intent intent) {
   super.onNewIntent(intent);
@@ -78,13 +103,27 @@ public class MainActivity extends Activity {
    if(link.contains("#pair=")) web.loadUrl(link);
   }
  }
- @Override protected void onPause(){web.onPause();super.onPause();}
- @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();}
+ @Override protected void onPause(){updates.pause();web.onPause();super.onPause();}
+ @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();if(updates!=null)updates.resume();}
  @Override public void onWindowFocusChanged(boolean focused){
   super.onWindowFocusChanged(focused);
   if(focused && web!=null && !web.hasFocus()) web.requestFocus();
  }
  @Override protected void onSaveInstanceState(Bundle state){web.saveState(state);super.onSaveInstanceState(state);}
  @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
- private void checkUpdate(){if(checking)return;checking=true;new Thread(()->{try{HttpURLConnection conn=(HttpURLConnection)new URL(ORIGIN+"/updates.json").openConnection();conn.setConnectTimeout(10000);conn.setReadTimeout(10000);conn.setInstanceFollowRedirects(false);ByteArrayOutputStream bytes=new ByteArrayOutputStream();try(InputStream input=conn.getInputStream()){byte[] buffer=new byte[2048];int n;while((n=input.read(buffer))!=-1){bytes.write(buffer,0,n);if(bytes.size()>32768)throw new Exception("Manifesto grande");}}finally{conn.disconnect();}JSONObject item=new JSONObject(bytes.toString("UTF-8")).getJSONObject("android");int version=item.getInt("versionCode");String link=item.getString("url");PackageInfo installed=getPackageManager().getPackageInfo(getPackageName(),0);if(version>installed.versionCode&&link.startsWith(ORIGIN+"/downloads/")&&link.endsWith(".apk"))runOnUiThread(()->new AlertDialog.Builder(this).setTitle("Atualização disponível").setMessage("Uma nova versão do NFS-e Conecta está disponível. Baixe e confirme a instalação no Android.").setPositiveButton("Atualizar",(dialog,which)->startActivity(new Intent(Intent.ACTION_VIEW,Uri.parse(link)))).setNegativeButton("Depois",null).show());}catch(Exception ignored){}finally{checking=false;}}).start();}
+ @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){
+  super.onRequestPermissionsResult(code,permissions,results);
+  if(code==41 && cameraRequest!=null){
+   if(results.length==1 && results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)
+    cameraRequest.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});
+   else cameraRequest.deny();
+   cameraRequest=null;
+  }
+ }
+ @Override protected void onDestroy(){
+  if(cameraRequest!=null){cameraRequest.deny();cameraRequest=null;}
+  if(updates!=null)updates.close();
+  if(web!=null)web.destroy();
+  super.onDestroy();
+ }
 }

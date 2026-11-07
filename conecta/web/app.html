@@ -11,6 +11,8 @@
     <link rel="icon" href="/icon.svg" />
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
+    <script src="/jsQR.js" defer></script>
+    <script src="/qr-scanner.js" defer></script>
   </head>
   <body class="app-body">
     <header class="app-nav">
@@ -20,6 +22,7 @@
       ><span class="pill">ANDROID + PC</span>
     </header>
     <main class="app-shell">
+      <button type="button" id="scan-qr" class="button secondary">Ler QR code do PC</button>
       <section id="pair-panel">
         <p class="eyebrow">SEU COMPUTADOR, CONECTADO</p>
         <h1>Vamos conectar?</h1>
@@ -28,6 +31,7 @@
           que aparece nele.
         </p>
         <form id="pair-form" class="app-card">
+          <p class="fine">Ou digite o código abaixo.</p>
           <label for="pair-code">Código do computador</label
           ><input
             id="pair-code"
@@ -114,6 +118,13 @@
         </div>
       </section>
       <p id="feedback" role="status" aria-live="polite"></p>
+      <p class="fine"><span id="installed-version"></span> <button type="button" id="check-updates" class="text-link">Verificar atualização</button></p>
+      <dialog id="qr-dialog" aria-labelledby="qr-title">
+        <h2 id="qr-title">Aponte para o QR do computador</h2>
+        <video id="qr-video" autoplay playsinline muted></video>
+        <p id="qr-feedback" role="status">Abrindo câmera…</p>
+        <button id="close-scanner" type="button" class="button secondary">Fechar câmera</button>
+      </dialog>
     </main>
   </body>
 </html>

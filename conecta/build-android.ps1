@@ -13,7 +13,8 @@ New-Item -ItemType Directory -Force -Path "$build/classes","$build/dex" | Out-Nu
 $source=Join-Path (Get-Location) 'android/MainActivity.java'
 $text=[IO.File]::ReadAllText($source).TrimStart([char]0xfeff)
 [IO.File]::WriteAllText($source,$text,[Text.UTF8Encoding]::new($false))
-& "$jdk/bin/javac.exe" --release 8 -classpath $platform -d "$build/classes" $source
+$sources=Get-ChildItem android -Filter "*.java" | Select-Object -ExpandProperty FullName
+& "$jdk/bin/javac.exe" --release 8 -classpath $platform -d "$build/classes" $sources
 if($LASTEXITCODE -ne 0){throw 'Falha Java'}
 & "$jdk/bin/jar.exe" cf "$build/classes.jar" -C "$build/classes" .
 & "$tools/d8.bat" --lib $platform --min-api 26 --output "$build/dex" "$build/classes.jar"

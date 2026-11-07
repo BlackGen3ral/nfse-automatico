@@ -6,7 +6,7 @@ Site e API públicos em https://nfse-conecta.pages.dev. Cada computador possui u
 
 ## Distribuição Windows
 
-O executável 1.2.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
+O executável 1.3.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
 
 ## Instalação
 
@@ -17,7 +17,7 @@ O executável 1.2.0 passou na verificação do Defender com marca de origem da I
 
 ## Atualizações
 
-A interface do Android é carregada do site com revalidação dos arquivos. O APK consulta updates.json ao abrir e oferece o download de uma nova versão, com confirmação da instalação pelo Android. O programa Windows consulta versões a cada hora e oferece a página de downloads quando encontra uma atualização. O usuário instala a nova versão. A extensão mantém o atualizador GitHub existente.
+A interface do Android é carregada do site com revalidação. A partir do Windows 1.3.0, o programa consulta versões ao iniciar e a cada 15 minutos, baixa o executável por HTTPS, verifica SHA-256 e troca para uma pasta de versão quando estiver ocioso. O processo novo aguarda o anterior sair. A partir do Android 1.2.0, o app verifica ao retornar e a cada intervalo mínimo de 15 minutos de uso, baixa pelo DownloadManager e verifica hash, pacote e assinatura antes de solicitar a instalação ao Android. A confirmação da instalação é feita pelo usuário. As versões anteriores precisam de uma atualização manual para receber esse mecanismo. A extensão mantém o atualizador GitHub existente.
 
 Para publicar uma melhoria, altere versions.json e as partes correspondentes, execute release.ps1 e npm run deploy. O Windows é compilado separadamente com build-pc.ps1 e só entra no pacote se windowsAvailable estiver habilitado e windowsApprovedSha256 corresponder ao executável. Atualize também o versionCode para cada APK novo. A assinatura do Android deve permanecer a mesma. A chave e sua senha protegida pelo Windows ficam em %LOCALAPPDATA%/NFSeConectaBuild e devem ter backup privado. Nunca publique essa pasta. O código não contém tokens de clientes nem certificados de empresas.
 
@@ -49,3 +49,7 @@ O endereço Pages usa uma Function com o binding ORIGIN apontando para o Worker 
 No Windows 1.2.0, Configurar certificado seleciona um certificado instalado e cria uma regra AutoSelectCertificateForUrls para certificado.nfse.gov.br no Chrome. O Windows pode solicitar elevação para gravar a regra. A escolha permanece local. Após uma solicitação, a extensão 0.5.2 mantém a intenção por guia por até 9 minutos, abre o acesso por certificado na tela de login e segue para Pessoas ao chegar à página inicial. O preenchimento requer uma solicitação pendente válida. PINs de tokens continuam sujeitos à confirmação local.
 
 Os testes automatizados cobrem login, navegação, expiração por guia e entrega única. O teste completo com a política aplicada e o certificado real no Chrome ainda precisa de validação.
+
+## Pareamento e câmera
+
+A API de status do PC diferencia credenciais válidas, celular conectado, código válido e solicitação ativa. Gerar um QR mantém o celular atual até o novo pareamento ser concluído. A troca é bloqueada durante uma solicitação ativa. O Windows recupera credenciais de dispositivo inválidas preservando a chave local da extensão. O botão Ler QR code do PC usa câmera e decodificação locais. A permissão é concedida apenas para vídeo no domínio do app. Os testes cobrem expiração, troca de celular, câmera simulada e integridade do atualizador. Ainda falta a validação em aparelho Android físico e a troca real de processos Windows.

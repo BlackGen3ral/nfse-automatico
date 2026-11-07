@@ -152,15 +152,19 @@ async function api(request, env) {
     const secret = token();
     const device = await db
       .prepare(
-        "UPDATE devices SET mobile_hash=?,pair_code=NULL,pair_expires=NULL WHERE pair_code=? AND pair_expires>? RETURNING id,name",
+        "UPDATE devices SET mobile_hash=?,pair_code=NULL,pair_expires=NULL WHERE pair_code=? AND pair_expires>? AND NOT EXISTS(SELECT 1 FROM jobs WHERE device_id=devices.id AND state IN('queued','claimed','running') AND expires>?) RETURNING id,name",
       )
-      .bind(await hash(secret), input.code, now)
+      .bind(await hash(secret), input.code, now, now)
       .first();
-    if (!device)
+    if (!device) {
+      const busy = await db.prepare("SELECT id FROM devices WHERE pair_code=? AND pair_expires>? AND EXISTS(SELECT 1 FROM jobs WHERE device_id=devices.id AND state IN('queued','claimed','running') AND expires>?)")
+        .bind(input.code, now, now).first();
+      if (busy) throw new ApiError(409, "Conclua a solicitação atual no PC antes de trocar de celular.");
       throw new ApiError(
         400,
         "Código vencido ou já utilizado. Gere outro no PC.",
       );
+    }
     return json({
       deviceId: device.id,
       name: device.name,
@@ -170,6 +174,16 @@ async function api(request, env) {
   const pc = path.startsWith("/api/pc/"),
     device = await authenticate(request, db, pc ? "pc" : "mobile");
   await cleanup(db);
+  if (pc && path === "/api/pc/status" && request.method === "POST") {
+    const active = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND state IN('queued','claimed','running')")
+      .bind(device.id).first();
+    return json({
+      paired: !!device.mobile_hash,
+      pairCode: device.pair_expires > now ? device.pair_code : null,
+      expires: device.pair_expires,
+      activeJob: !!active,
+    });
+  }
   if (pc && path === "/api/pc/pair" && request.method === "POST") {
     const active = await db
       .prepare(
@@ -185,7 +199,7 @@ async function api(request, env) {
     const code = token().slice(0, 12).toUpperCase();
     await db
       .prepare(
-        "UPDATE devices SET pair_code=?,pair_expires=?,mobile_hash=NULL WHERE id=?",
+        "UPDATE devices SET pair_code=?,pair_expires=? WHERE id=?",
       )
       .bind(code, now + 300000, device.id)
       .run();
@@ -204,6 +218,7 @@ async function api(request, env) {
       .first();
     return json({
       paired: !!device.mobile_hash,
+      pairCode: device.pair_expires > now ? device.pair_code : null,
       job: job
         ? { id: job.id, invoice: JSON.parse(job.payload), expires: job.expires }
         : null,
@@ -314,7 +329,8 @@ export default {
           "x-content-type-options": "nosniff",
           "referrer-policy": "no-referrer",
           "content-security-policy":
-            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+            "default-src 'self'; script-src 'self'; style-src 'self'; img-src 'self' data:; media-src 'self' blob:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'",
+          "permissions-policy": "camera=(self), microphone=()",
           ...(url.pathname.endsWith(".exe") ||
           url.pathname.endsWith(".apk") ||
           url.pathname.endsWith(".zip")
