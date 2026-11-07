@@ -15,6 +15,9 @@ let initializing = true;
 let draftKey;
 let refreshSequence = 0;
 const savedCnpjsKey = "nfseSavedCnpjs";
+const pickerAboveKey = "nfseCnpjPickerAbove";
+let pickerAbove = false, positionSaving = false;
+const pickerAboveChoice = document.getElementById("cnpj-picker-above");
 let savedCnpjs = [], savedWriting = false;
 const savedPicker = document.getElementById("saved-cnpjs");
 const savedSearch = document.getElementById("search-cnpj");
@@ -25,7 +28,7 @@ function positionSavedPicker() {
   if (!pickerOpen()) return;
   const rect = input.getBoundingClientRect();
   const above = rect.top - 16, below = innerHeight - rect.bottom - 16;
-  const showAbove = above >= 160 || above >= below;
+  const showAbove = pickerAbove ? above >= 160 || above >= below : below < 160 && above > below;
   savedPicker.style.width = Math.min(Math.max(rect.width, 240), 340, innerWidth - 16) + "px";
   savedPicker.style.maxHeight = Math.max(100, Math.min(320, showAbove ? above : below)) + "px";
   savedPicker.style.left = Math.max(8, Math.min(rect.left, innerWidth - savedPicker.offsetWidth - 8)) + "px";
@@ -46,6 +49,24 @@ input.addEventListener("keydown", event => {
   if (event.key === "ArrowDown" && !event.isComposing) { event.preventDefault(); openSavedPicker(true); }
 });
 savedOpener.onclick = () => openSavedPicker(true);
+pickerAboveChoice.addEventListener("change", async () => {
+  if (input.disabled || positionSaving) return;
+  const previous = pickerAbove;
+  pickerAbove = pickerAboveChoice.checked;
+  positionSaving = true;
+  pickerAboveChoice.disabled = true;
+  positionSavedPicker();
+  try { await chrome.storage.local.set({[pickerAboveKey]: pickerAbove}); }
+  catch {
+    pickerAbove = previous;
+    pickerAboveChoice.checked = previous;
+    positionSavedPicker();
+    savedMessage("Não foi possível salvar a posição da caixinha. Tente novamente.", true);
+  } finally {
+    positionSaving = false;
+    pickerAboveChoice.disabled = input.disabled;
+  }
+});
 document.getElementById("close-cnpjs").onclick = () => { closeSavedPicker(); input.focus({preventScroll:true}); };
 savedSearch.addEventListener("input", renderSavedCnpjs);
 savedSearch.addEventListener("keydown", event => {
@@ -80,6 +101,7 @@ function renderSavedCnpjs() {
   save.disabled = blocked || digits(input.value).length !== 14 || saved;
   save.textContent = saved ? "✓ Salvo" : "＋ Salvar";
   savedOpener.disabled = blocked;
+  pickerAboveChoice.disabled = input.disabled || positionSaving;
   if (input.disabled) closeSavedPicker();
   document.getElementById("saved-cnpj-count").textContent = String(savedCnpjs.length);
   const list = document.getElementById("saved-cnpj-list");
@@ -282,6 +304,9 @@ async function initialize() {
   try {
     const stored = await chrome.storage.local.get(savedCnpjsKey);
     savedCnpjs = cleanSavedCnpjs(stored[savedCnpjsKey]);
+    const position = await chrome.storage.local.get(pickerAboveKey);
+    pickerAbove = position[pickerAboveKey] === true;
+    pickerAboveChoice.checked = pickerAbove;
   } catch { savedMessage("Não foi possível carregar os CNPJs salvos.", true); }
   await refresh();
   if (!input.disabled && peopleUrl.test(tab?.url || "")) input.focus({preventScroll:true});
@@ -373,6 +398,11 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
   }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[pickerAboveKey]) {
+    pickerAbove = changes[pickerAboveKey].newValue === true;
+    pickerAboveChoice.checked = pickerAbove;
+    positionSavedPicker();
+  }
   if (area === "local" && changes[savedCnpjsKey]) {
     savedCnpjs = cleanSavedCnpjs(changes[savedCnpjsKey].newValue);
     renderSavedCnpjs();

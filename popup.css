@@ -132,10 +132,12 @@ main{padding-block:10px}
 .saved-picker-heading strong{font-size:12px;font-weight:650}
 #close-cnpjs{flex:none;display:grid;place-items:center;width:23px;height:23px;padding:0;border:0;border-radius:6px;background:#f2f7f3;color:#708e7b;font:17px/1 system-ui;cursor:pointer}
 #close-cnpjs:hover{background:#e8f2ec}
-#saved-cnpjs label{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+#saved-cnpjs label[for="search-cnpj"]{position:absolute;width:1px;height:1px;padding:0;margin:-1px;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 .saved-picker-heading{margin-bottom:8px}
 #search-cnpj{flex:none;min-height:35px;padding:8px 10px;font-size:12px;border-radius:8px}
 #saved-cnpj-list{flex:1 1 auto;min-height:0;max-height:none;grid-template-columns:minmax(0,1fr);margin-top:8px}
 #saved-cnpjs>p{flex:none;margin:8px 0 0;font-size:9px;color:#859f8e}
 #saved-cnpjs>#saved-cnpj-empty{padding:7px 0;color:#688672;font-size:11px}
 #saved-cnpj-list .choose-cnpj{padding-block:7px}
+.picker-position{display:flex;align-items:center;gap:7px;flex:none;margin:9px 0 0;padding-top:8px;border-top:1px solid #edf2ee;font-size:10px;font-weight:400;color:#789481;cursor:pointer}
+.picker-position input{width:13px;height:13px;min-height:0;flex:none;margin:0;padding:0;accent-color:#218659;box-shadow:none}
