@@ -118,3 +118,37 @@ test("Pareamento, autenticação, fila exclusiva, entrega única e resultado", a
   await call("/api/unpair", mobile.mobileToken, {});
   assert.equal((await call("/api/status", mobile.mobileToken)).status, 401);
 });
+test("Cancelamento mantém a fila bloqueada até confirmar a parada e rejeita progresso tardio",async()=>{
+  const env={DB:database()};
+  async function call(path,credential,data) {
+    const result=await worker.fetch(new Request("https://test.local"+path,{
+      method:data?"POST":"GET",
+      headers:{"content-type":"application/json",...(credential?{authorization:"Bearer "+credential}:{})},
+      ...(data?{body:JSON.stringify(data)}:{}),
+    }),env);
+    return {status:result.status,data:await result.json()};
+  }
+  const pc=(await call("/api/register",null,{name:"Teste de parada"})).data;
+  const mobile=(await call("/api/pair",null,{code:pc.pairCode})).data;
+  await call("/api/pc/poll",pc.pcToken,{});
+  const queued=crypto.randomUUID();
+  await call("/api/jobs",mobile.mobileToken,{requestId:queued,invoice});
+  assert.equal((await call("/api/jobs/cancel",mobile.mobileToken,{id:queued})).data.state,"cancelled");
+  assert.equal((await call("/api/pc/poll",pc.pcToken,{})).data.job,null);
+  assert.equal((await call("/api/jobs/cancel",mobile.mobileToken,{id:queued})).data.state,"cancelled");
+  const id=crypto.randomUUID();
+  await call("/api/jobs",mobile.mobileToken,{requestId:id,invoice});
+  await call("/api/pc/poll",pc.pcToken,{});
+  assert.equal((await call("/api/jobs/cancel","0".repeat(64),{id})).status,401);
+  assert.equal((await call("/api/jobs/cancel",mobile.mobileToken,{id})).data.state,"claimed");
+  assert.equal((await call("/api/pc/poll",pc.pcToken,{})).data.cancelJobId,id);
+  assert.equal((await call("/api/jobs",mobile.mobileToken,{requestId:crypto.randomUUID(),invoice})).status,409);
+  const late=await call("/api/pc/progress",pc.pcToken,{id,state:"review",message:"Resposta tardia"});
+  assert.equal(late.data.cancelRequested,true);
+  assert.equal((await call("/api/status",mobile.mobileToken)).data.job.state,"claimed");
+  await call("/api/pc/progress",pc.pcToken,{id,state:"cancelled",message:"Interrompido"});
+  assert.equal((await call("/api/status",mobile.mobileToken)).data.job.state,"cancelled");
+  await call("/api/pc/progress",pc.pcToken,{id,state:"running",message:"Progresso tardio"});
+  assert.equal((await call("/api/status",mobile.mobileToken)).data.job.state,"cancelled");
+  assert.equal((await call("/api/jobs",mobile.mobileToken,{requestId:crypto.randomUUID(),invoice})).status,201);
+});

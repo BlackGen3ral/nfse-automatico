@@ -3,6 +3,10 @@
   const DIGITS = (value) => (value || "").replace(/\D/g, "");
   const norm = (value) => (value || "").normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLocaleLowerCase("pt-BR").replace(/[^a-z0-9]+/g, " ").trim();
   let running = false;
+  let stopped = false, activeRemoteJobId = null;
+  function ensureRunning() {
+    if (stopped) { const error = new Error("Preenchimento interrompido."); error.name = "AbortError"; throw error; }
+  }
   const peoplePath = /\/DPS\/Pessoas(?:\/|$)/i;
   const servicePath = /\/DPS\/Servi(?:c|ç|%c3%a7)o(?:\/|$)/i;
   const valuesPath = /\/DPS\/Tributacao(?:\/|$)/i;
@@ -44,6 +48,7 @@
   }
 
   function setNativeValue(element, value) {
+    ensureRunning();
     if (!element || element.disabled) return false;
     const next = String(value);
     if (element.value === next) return true;
@@ -59,6 +64,7 @@
   }
 
   function selectOption(element, wanted, firstValid = false) {
+    ensureRunning();
     if (!(element instanceof HTMLSelectElement)) return false;
     const options = Array.from(element.options).filter((option) =>
       !option.matches(":disabled") && option.value && !/^selecione\b/.test(norm(option.textContent)));
@@ -104,6 +110,7 @@
   }
 
   function pressWidgetKey(element, key, code) {
+    ensureRunning();
     element.dispatchEvent(new KeyboardEvent("keydown", {
       key, keyCode: code, which: code, bubbles: true, cancelable: true
     }));
@@ -138,6 +145,7 @@
       });
       for (const term of terms) {
         guide.point(search);
+        ensureRunning();
         search.value = term;
         search.dispatchEvent(new Event("input", { bubbles: true }));
         const result = await waitFor(label + " · resultado", () => {
@@ -148,6 +156,7 @@
         }, 4500).catch((error) => { if (!error.retryable) throw error; return null; });
         if (!result) continue;
         guide.point(result, true);
+        ensureRunning();
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
         guide.point(control);
         await waitFor(label + " · seleção", selected);
@@ -182,6 +191,7 @@
   }
 
   function chooseRadio(scope, optionText, group) {
+    ensureRunning();
     const radio = findRadio(scope, optionText, group);
     if (!radio || radio.disabled) return !!radio?.checked;
     if (!radio.checked) {
@@ -463,11 +473,24 @@
   const guide = createGuide();
 
 
-  function showStatus(phase, text) { guide.show(phase, text); }
+  function showStatus(phase, text) { ensureRunning(); guide.show(phase, text); }
+  let controlTimer, controlPending = false;
+  async function checkRemoteControl() {
+    if (controlPending) return;
+    controlPending = true;
+    clearTimeout(controlTimer);
+    try {
+      const result = await chrome.runtime.sendMessage({type:"nfse:remote-control"});
+      if (result?.jobId && result.active) activeRemoteJobId = result.jobId;
+      if (result?.active && !stopped) controlTimer = setTimeout(checkRemoteControl,800);
+    } catch {}
+    finally { controlPending = false; }
+  }
 
   const draftId = () => new URLSearchParams(location.search).get("idr");
 
   function update(phase, text, { valuesDraft = null, invoice = null, invoiceDraft = null, retryStep = null } = {}) {
+    ensureRunning();
     showStatus(phase, text);
     return chrome.runtime.sendMessage({
       type: "nfse:update",
@@ -495,6 +518,7 @@
   }
 
   function advanceButton(fieldId, stagePath, stageName) {
+    ensureRunning();
     const field = document.getElementById(fieldId);
     const form = field?.form || field?.closest("form");
     if (!stagePath.test(location.pathname) || !form) throw new Error("Formulário da etapa " + stageName);
@@ -508,10 +532,12 @@
   }
 
   function watchAdvance(path, button, stageName, invoice = null) {
+    ensureRunning();
     guide.point(button, true);
+    ensureRunning();
     button.click();
     setTimeout(() => {
-      if (path.test(location.pathname)) {
+      if (!stopped && path.test(location.pathname)) {
         report(new Error("O portal permaneceu em " + stageName + ". Verifique os avisos da página"), invoice).catch(() => {});
       }
     }, 25000);
@@ -561,6 +587,7 @@
     const startedAt = Date.now();
     let waitingShown = false, extended = false, checkedAt = -Infinity;
     do {
+      ensureRunning();
       if (Date.now() - checkedAt >= 400) {
         checkedAt = Date.now();
         const health = portalHealth();
@@ -622,6 +649,7 @@
     await recoverStep(label + " · pesquisa", async () => {
     if (!button.isConnected || button.disabled || DIGITS(field()?.value) !== cnpj) throw portalFailure(label + " · pesquisa indisponível");
     guide.point(button, true);
+    ensureRunning();
     button.click();
     await waitFor(label + " · resultado da pesquisa", () => {
       const name = lookupName(scope(), stem);
@@ -662,7 +690,7 @@
     const issues = [];
     async function tryStep(step) {
       try { await step(); return true; }
-      catch (error) { issues.push(error.message); return false; }
+      catch (error) { if (error.name === "AbortError") throw error; issues.push(error.message); return false; }
     }
     const regime = () => findControl(scope, /regime de apuracao/);
     if (regime()) await tryStep(() => waitFor("Regime de apuração", () => selectOption(regime(), settings.regime, !settings.regime || settings.regime === "first-valid")));
@@ -699,9 +727,10 @@
     });
     if (!armed || !peoplePath.test(location.pathname)) throw new Error("Transição para Serviço");
     guide.point(next, true);
+    ensureRunning();
     next.click();
     setTimeout(() => {
-      if (peoplePath.test(location.pathname)) {
+      if (!stopped && peoplePath.test(location.pathname)) {
         update("error", "O portal permaneceu em Pessoas. Confira os avisos da página antes de avançar.").catch(() => {});
       }
     }, 120000);
@@ -713,7 +742,7 @@
     const select = (label, id, value) => waitFor(label, () => selectOption(document.getElementById(id), value), 12000);
     const issues = [];
     async function attempt(step) {
-      try { await step(); } catch (error) { issues.push(error.message); }
+      try { await step(); } catch (error) { if (error.name === "AbortError") throw error; issues.push(error.message); }
     }
     await attempt(async () => {
       await select("País", "LocalPrestacao_CodigoPaisPrestacao", "Brasil");
@@ -776,7 +805,7 @@
     const issues = [];
     async function attempt(step) {
       try { await step(); return true; }
-      catch (error) { issues.push(error.message); return false; }
+      catch (error) { if (error.name === "AbortError") throw error; issues.push(error.message); return false; }
     }
     const select = (label, id, code) => waitFor(label,
       () => selectOption(document.getElementById(id), code), 12000);
@@ -829,6 +858,7 @@
   }
 
   function report(error, invoice = null) {
+    if (stopped || error.name === "AbortError") return Promise.resolve(null);
     const draft = invoice && draftId();
     const health = portalHealth();
     const detail = health?.message || error.message;
@@ -856,6 +886,9 @@
   }
 
   async function resume() {
+    if (stopped) return;
+    await checkRemoteControl();
+    if (stopped) return;
     const inValues = valuesPath.test(location.pathname);
     if (!inValues && !servicePath.test(location.pathname) && !peoplePath.test(location.pathname)) {
       const state = await chrome.runtime.sendMessage({type:"nfse:status"});
@@ -891,6 +924,14 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _, respond) => {
+    if (message.type === "nfse:stop") {
+      if (running && activeRemoteJobId !== message.jobId) { respond({stopped:false}); return; }
+      stopped = true;
+      clearTimeout(controlTimer);
+      guide.show("error","Preenchimento interrompido pelo celular. Confira os dados já preenchidos no portal.");
+      respond({stopped:true});
+      return;
+    }
     if (message.type === "nfse:start-service" || message.type === "nfse:start-values") {
       const inValues = message.type === "nfse:start-values";
       if (running || !(inValues ? valuesPath : servicePath).test(location.pathname)) {
@@ -898,9 +939,11 @@
         return;
       }
       running = true;
+      stopped = false; activeRemoteJobId = null;
       respond({ ok: true });
       let invoice = null;
       (async () => {
+        await chrome.runtime.sendMessage({type:"nfse:manual-begin"});
         const state = await chrome.runtime.sendMessage({ type: "nfse:status" });
         if (state?.until > Date.now() && state.retryStep === (inValues ? "values" : "service") &&
             state.invoiceDraft === draftId() && validInvoice(state.invoice)) invoice = state.invoice;
@@ -914,8 +957,12 @@
       return;
     }
     running = true;
+    stopped = false; activeRemoteJobId = message.jobId || null;
     let replied = false;
     (async () => {
+      if (message.jobId) await checkRemoteControl();
+      else await chrome.runtime.sendMessage({type:"nfse:manual-begin"});
+      ensureRunning();
       const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…", { invoice: message.invoice, invoiceDraft: draftId() });
       if (!state) throw new Error("Início do preenchimento");
       showStatus("people", "Conferindo os dados do emitente…");
@@ -981,12 +1028,13 @@
         }
         return;
       }
-      if (!/^\/EmissorNacional(?:\/Home(?:\/Index)?)?$/i.test(path)) return;
-      const peopleLink = Array.from(document.querySelectorAll("a[href]")).find((link) => {
+      if (state.command !== "open-invoice" || !/^\/EmissorNacional(?:\/Dashboard|\/Home(?:\/Index)?)?$/i.test(path)) return;
+      const peopleLinks = Array.from(document.querySelectorAll("a[href]")).filter((link) => {
         const url = new URL(link.href, location.href);
         return url.origin === location.origin &&
           /^\/EmissorNacional\/DPS\/Pessoas\/?$/i.test(url.pathname);
       });
+      const peopleLink = peopleLinks.find((link) => /Nova NFS-e - Emissão Completa/i.test(link.getAttribute?.("data-original-title") || link.title || "")) || peopleLinks[0];
       if (peopleLink && !peopleLink.dataset.nfseOpening) {
         peopleLink.dataset.nfseOpening = "true";
         peopleLink.click();

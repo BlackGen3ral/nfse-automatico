@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.3.0";
+ public const string CurrentVersion="1.4.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -49,6 +49,9 @@ internal sealed class ConectaForm:Form {
  Dictionary<string,object> config=new Dictionary<string,object>();
  Dictionary<string,object> job;
  bool delivered;
+ string cancelledJobId="";
+ string closedJobId="";
+ volatile bool waitingForStop;
  volatile bool exit,updating;
  string lastId="",pendingState="",pendingText="";
  DateTime jobStarted;
@@ -199,6 +202,8 @@ internal sealed class ConectaForm:Form {
    if(updating || exit) return;
    var data=await Api("/api/pc/poll",new{},true);
    ApplyPairingState(data);
+   var cancelId=Str(data,"cancelJobId");
+   if(cancelId!="")RequestCancellation(cancelId);
    if(!data.ContainsKey("job") || data["job"]==null) return;
    var incoming=(Dictionary<string,object>)data["job"];
    var id=Str(incoming,"id");
@@ -229,21 +234,26 @@ internal sealed class ConectaForm:Form {
     await ClaimJob();
     string state,text,idCurrent;
     lock(gate) {
-     if(job!=null && (DateTime.UtcNow-jobStarted).TotalMinutes>9) {
+     if(job!=null && !waitingForStop && (DateTime.UtcNow-jobStarted).TotalMinutes>9) {
       pendingState="error";
       pendingText="O preenchimento não terminou no prazo. Confira o portal antes de enviar outra solicitação.";
      }
      state=pendingState;
      text=pendingText;
-     idCurrent=job==null?"":Str(job,"id");
+     idCurrent=state=="cancelled"?cancelledJobId:job==null?"":Str(job,"id");
     }
     if(state!="" && idCurrent!="") {
-     await Api("/api/pc/progress",new{id=idCurrent,state=state,message=text},true);
+     var result=await Api("/api/pc/progress",new{id=idCurrent,state=state,message=text},true);
+     if(result.ContainsKey("cancelRequested") && Convert.ToBoolean(result["cancelRequested"])) {
+      RequestCancellation(idCurrent);
+      continue;
+     }
      lock(gate) {
       if(pendingState==state && pendingText==text) {
        pendingState="";
        pendingText="";
-       if(state=="review" || state=="error") job=null;
+       if(state=="review" || state=="error" || state=="cancelled") job=null;
+       if(state=="cancelled")waitingForStop=false;
       }
      }
      SetStatus(text);
@@ -253,8 +263,18 @@ internal sealed class ConectaForm:Form {
      nextUpdate=DateTime.UtcNow.AddMinutes(15);
     }
    } catch { SetStatus("Reconectando ao serviço. Os dados da solicitação atual continuam preservados."); }
-   await Task.Delay(3000);
+   await Task.Delay(job!=null || pendingState=="cancelled"?1000:3000);
   }
+ }
+ void RequestCancellation(string id) {
+  lock(gate) {
+   if(cancelledJobId==id)return;
+   cancelledJobId=id;
+   waitingForStop=true;
+   pendingState=(job!=null && Str(job,"id")==id && !delivered) || closedJobId==id?"cancelled":"";
+   pendingText=pendingState=="cancelled"?"Preenchimento interrompido antes de iniciar.":"";
+  }
+  SetStatus("Parada solicitada. Aguardando a extensão interromper o preenchimento…");
  }
  void AcceptLoop(){while(!exit){try{var client=listener.AcceptTcpClient();Task.Run(()=>ProcessConnection(client));}catch{if(exit)return;}}}
  void ProcessConnection(TcpClient client){using(client){try{
@@ -263,8 +283,24 @@ internal sealed class ConectaForm:Form {
   var auth=map.ContainsKey("Authorization")?map["Authorization"]:"";var expected="Bearer "+Str(config,"bridgeKey");int diff=auth.Length^expected.Length;for(int i=0;i<Math.Min(auth.Length,expected.Length);i++)diff|=auth[i]^expected[i];if(diff!=0){Respond(stream,401,new{error="Não autorizado"});return;}
   int length=0;if(map.ContainsKey("Content-Length"))Int32.TryParse(map["Content-Length"],out length);if(length<0||length>16384){Respond(stream,413,new{error="Dados grandes"});return;}
   var bytes=new byte[length];int offset=0;while(offset<length){var read=stream.Read(bytes,offset,length-offset);if(read<=0)return;offset+=read;}
-  object result=new{ok=true};if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){result=new{job=job!=null&&!delivered?job:null};}if(job==null)SetStatus("Extensão conectada. Você já pode enviar uma nota pelo celular.");}
-  else if(parts[0]=="POST"&&(parts[1]=="/ack"||parts[1]=="/progress")){var data=Parse(Encoding.UTF8.GetString(bytes));lock(gate){if(job!=null&&Str(data,"id")==Str(job,"id")){if(parts[1]=="/ack"){delivered=true;pendingState="running";pendingText="Conferindo a sessão e os dados no portal…";}else{var phase=Str(data,"phase");pendingState=phase=="review-ready"?"review":phase=="error"?"error":"running";pendingText=Str(data,"text");}}}}
+  object result=new{ok=true};
+  if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){
+   bool available=job!=null&&!delivered&&Str(job,"id")!=cancelledJobId;
+   result=new{job=available?job:null,command=available?"open-invoice":null,cancelledJobId=cancelledJobId};
+  }}
+  else if(parts[0]=="GET"&&parts[1]=="/control"){lock(gate){result=new{jobId=job==null?"":Str(job,"id"),cancelledJobId=cancelledJobId};}}
+  else if(parts[0]=="POST"&&parts[1]=="/closed"){
+   var data=Parse(Encoding.UTF8.GetString(bytes));
+   lock(gate){if(Str(data,"id")==lastId){closedJobId=lastId;if(closedJobId==cancelledJobId){pendingState="cancelled";pendingText="Preenchimento interrompido. A guia do portal foi fechada.";}}}
+  }
+  else if(parts[0]=="POST"&&parts[1]=="/cancel-ack"){
+   var data=Parse(Encoding.UTF8.GetString(bytes));
+   lock(gate){if(Str(data,"id")==cancelledJobId && cancelledJobId!=""){pendingState="cancelled";pendingText="Preenchimento interrompido. Confira os dados já preenchidos no portal.";}}
+  }
+  else if(parts[0]=="POST"&&(parts[1]=="/ack"||parts[1]=="/progress")){var data=Parse(Encoding.UTF8.GetString(bytes));lock(gate){
+   if(Str(data,"id")==cancelledJobId){Respond(stream,200,new{cancelled=true});return;}
+   if(job!=null&&Str(data,"id")==Str(job,"id")){if(parts[1]=="/ack"){delivered=true;pendingState="running";pendingText="Conferindo a sessão e os dados no portal…";}else{var phase=Str(data,"phase");pendingState=phase=="review-ready"?"review":phase=="error"?"error":"running";pendingText=Str(data,"text");}}
+  }}
   else {Respond(stream,404,new{error="Endereço inválido"});return;}
   Respond(stream,200,result);
  }catch{} }}
@@ -273,7 +309,7 @@ internal sealed class ConectaForm:Form {
   await executionGate.WaitAsync();
   try {
    lock(gate) {
-    if(job!=null) {
+    if(job!=null || waitingForStop) {
      if(manual) SetStatus("Conclua a solicitação atual antes de verificar atualizações.");
      return;
     }

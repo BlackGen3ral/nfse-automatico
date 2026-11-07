@@ -53,3 +53,9 @@ Os testes automatizados cobrem login, navegação, expiração por guia e entreg
 ## Pareamento e câmera
 
 A API de status do PC diferencia credenciais válidas, celular conectado, código válido e solicitação ativa. Gerar um QR mantém o celular atual até o novo pareamento ser concluído. A troca é bloqueada durante uma solicitação ativa. O Windows recupera credenciais de dispositivo inválidas preservando a chave local da extensão. O botão Ler QR code do PC usa câmera e decodificação locais. A permissão é concedida apenas para vídeo no domínio do app. Os testes cobrem expiração, troca de celular, câmera simulada e integridade do atualizador. Ainda falta a validação em aparelho Android físico e a troca real de processos Windows.
+
+## Abertura e parada remotas
+
+Windows 1.4.0 envia open-invoice pela ponte local enquanto há solicitação pendente. A extensão 0.5.4 reconhece /EmissorNacional/Dashboard e usa o link real do atalho Nova NFS-e - Emissão Completa. O celular pode solicitar parada. Antes de iniciar, a fila cancela imediatamente. Durante uma execução, o estado final depende da confirmação da extensão, que bloqueia novas escritas e avanços. Mensagens de progresso tardias não podem substituir uma parada solicitada. Dados já preenchidos permanecem no portal para conferência.
+
+Bancos anteriores exigem executar server/migrations/001-cancellation.sql uma vez, após conferir PRAGMA table_info(jobs). Bancos novos usam schema.sql. A migração foi aplicada ao banco publicado. Os testes incluem o Dashboard, a parada dentro de esperas, a proteção contra avanço posterior e um teste HTTP real da fila de cancelamento com dados sintéticos removidos ao final. A interação completa do Chrome e a confirmação no aparelho Android ainda precisam de validação.

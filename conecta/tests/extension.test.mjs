@@ -27,6 +27,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   };
   const bridge = "a".repeat(64);
   let pendingJob = null;
+  let controlJobId = job.id, cancelledJobId = "";
   const chrome = {
     runtime: { onMessage: { addListener: (f) => listeners.push(f) } },
     storage: { local: storage(local), session: storage(session) },
@@ -34,7 +35,7 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
       onRemoved: { addListener() {} },
       sendMessage: async (id, m) => {
         calls.push(m);
-        return { ok: true };
+        return m.type === "nfse:stop" ? {stopped:true} : { ok: true };
       },
     },
     sidePanel: { setPanelBehavior: async () => {} },
@@ -44,7 +45,8 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
     fetches.push({ url, data: options.body ? JSON.parse(options.body) : null });
     return {
       ok: true,
-      json: async () => (url.endsWith("/job") ? { job: pendingJob } : { ok: true }),
+      json: async () => (url.endsWith("/job") ? {job:pendingJob,command:pendingJob?"open-invoice":null} :
+        url.endsWith("/control") ? {jobId:controlJobId,cancelledJobId} : {ok:true}),
     };
   };
   vm.runInNewContext(
@@ -103,5 +105,18 @@ test("Extensão entrega uma vez e só confirma revisão na página correta", asy
   sender.url = "https://www.nfse.gov.br/EmissorNacional/DPS/Revisao?idr=teste";
   assert((await send({ type: "nfse:remote-result" })).ok);
   assert(fetches.some((f) => f.data?.phase === "review-ready"));
+  controlJobId = "";
+  await send({type:"nfse:remote-control"});
   assert.equal(session["nfseRemote:5"], undefined);
+  const second = {...job,id:crypto.randomUUID()};
+  pendingJob = second;
+  sender.url = "https://www.nfse.gov.br/EmissorNacional/DPS/Pessoas?idr=teste";
+  assert((await send({type:"nfse:connect-pc"})).ok);
+  controlJobId = second.id;
+  cancelledJobId = second.id;
+  assert.equal((await send({type:"nfse:remote-control"})).stopped,true);
+  assert.equal(session["nfseFlow:5"].phase,"cancelled");
+  assert(fetches.some(f=>f.url.endsWith("/cancel-ack") && f.data.id===second.id));
+  await send({type:"nfse:update",state:{phase:"service",until:Date.now()+10000}});
+  assert.equal(session["nfseFlow:5"].phase,"cancelled");
 });

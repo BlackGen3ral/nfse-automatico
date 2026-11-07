@@ -1,6 +1,7 @@
 const key = (id) => "nfseFlow:" + id;
 const draftKey = (id) => "nfsePopupDraft:" + id;
 const queues = new Map();
+const remoteTerminalKey = (tabId, jobId) => "nfseRemoteTerminal:" + tabId + ":" + jobId;
 
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   const id = sender.tab?.id;
@@ -9,6 +10,8 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
     const storageKey = key(id);
     const stored = (await chrome.storage.session.get(storageKey))[storageKey];
     if (message.type === "nfse:status") return stored;
+    const remote = (await chrome.storage.session.get("nfseRemote:" + id))["nfseRemote:" + id];
+    if (remote?.cancelled) return null;
     if (message.type === "nfse:recover") {
       const url = new URL(sender.url);
       const step = /\/DPS\/Tributacao(?:\/|$)/i.test(url.pathname) ? "values" : /\/DPS\/Servi(?:c|ç|%c3%a7)o(?:\/|$)/i.test(url.pathname) ? "service" : null;
@@ -50,8 +53,11 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
 });
 chrome.tabs.onRemoved.addListener(async (id) => {
   await queues.get(id)?.catch(() => {});
+  const remote = (await chrome.storage.session.get("nfseRemote:" + id))["nfseRemote:" + id];
+  const {nfseBridgeKey} = await chrome.storage.local.get("nfseBridgeKey");
+  if (remote && nfseBridgeKey) await localRequest("/closed",nfseBridgeKey,{id:remote.jobId}).catch(()=>{});
   await remoteProgress(id,"error","A guia do portal foi fechada. Confira o PC antes de enviar outra solicitação.").catch(()=>{});
-  await chrome.storage.session.remove([key(id), draftKey(id)]);
+  await chrome.storage.session.remove([key(id), draftKey(id), "nfseRemote:" + id]);
   const owner = (await chrome.storage.session.get("nfsePortalOwner")).nfsePortalOwner;
   if (owner?.tabId === id) await chrome.storage.session.remove("nfsePortalOwner");
   await chrome.storage.session.remove("nfsePortal:" + id);
@@ -67,29 +73,24 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       !/^\/EmissorNacional(?:\/|$)/i.test(url.pathname)) return;
   const task = (async () => {
     const key = "nfsePortal:" + sender.tab.id;
-    let state = (await chrome.storage.session.get(key))[key];
     const ownerKey = "nfsePortalOwner";
+    let state = (await chrome.storage.session.get(key))[key];
     const owner = (await chrome.storage.session.get(ownerKey))[ownerKey];
-    if (/^[a-f0-9]{64}$/.test(message.bridgeKey)) {
-      await chrome.storage.local.set({ nfseBridgeKey: message.bridgeKey });
-      state = { until: Date.now() + 9 * 60 * 1000 };
-      await chrome.storage.session.set({ [key]: state, [ownerKey]: {tabId: sender.tab.id, until: state.until} });
-    } else if (!state &&
-               (!owner || owner.until <= Date.now() || owner.tabId === sender.tab.id)) {
-      const {nfseBridgeKey} = await chrome.storage.local.get("nfseBridgeKey");
-      if (/^[a-f0-9]{64}$/.test(nfseBridgeKey)) {
-        const {job} = await localRequest("/job", nfseBridgeKey);
-        if (job && /^[a-f0-9-]{36}$/.test(job.id) && Number.isFinite(job.expires) &&
-            job.expires > Date.now() &&
-            !(await chrome.storage.session.get("nfseRemoteJob:" + job.id))["nfseRemoteJob:" + job.id]) {
-          state = {until: Math.min(job.expires, Date.now() + 9 * 60 * 1000)};
-          await chrome.storage.session.set({[key]: state, [ownerKey]: {tabId: sender.tab.id, until: state.until}});
-        }
-      }
+    const bridgeKey = message.bridgeKey || (await chrome.storage.local.get("nfseBridgeKey")).nfseBridgeKey;
+    if (!/^[a-f0-9]{64}$/.test(bridgeKey)) return {active:false};
+    if (message.bridgeKey) await chrome.storage.local.set({nfseBridgeKey:bridgeKey});
+    const control = await localRequest("/job", bridgeKey);
+    const job = control.job;
+    const pending = job && /^[a-f0-9-]{36}$/.test(job.id) && Number.isFinite(job.expires) &&
+      job.expires > Date.now() && control.cancelledJobId !== job.id &&
+      !(await chrome.storage.session.get("nfseRemoteJob:" + job.id))["nfseRemoteJob:" + job.id];
+    if (message.bridgeKey || (!state && pending && (!owner || owner.until <= Date.now() || owner.tabId === sender.tab.id))) {
+      state = {until:Math.min(job?.expires || Infinity, Date.now() + 9*60*1000)};
+      await chrome.storage.session.set({[key]:state,[ownerKey]:{tabId:sender.tab.id,until:state.until}});
     }
-    return { active: !!state && state.until > Date.now() };
-  })();
-  task.then(respond, () => respond({ active: false }));
+    const active = !!state && state.until > Date.now() && (pending || !control.cancelledJobId);
+    return {active,command:active && pending && (control.command === "open-invoice" || control.command === undefined) ? "open-invoice" : null};
+  })();  task.then(respond, () => respond({ active: false }));
   return true;
 });
 async function localRequest(path, token, data) {
@@ -105,11 +106,42 @@ async function localRequest(path, token, data) {
 async function remoteProgress(tabId, phase, text) {
   const storageKey = "nfseRemote:" + tabId;
   const remote = (await chrome.storage.session.get(storageKey))[storageKey];
-  if (!remote) return;
+  if (!remote || remote.cancelled) return;
   const {nfseBridgeKey} = await chrome.storage.local.get("nfseBridgeKey");
   if (!nfseBridgeKey) return;
-  await localRequest("/progress", nfseBridgeKey, {id:remote.jobId,phase,text});
-  if (phase === "error" || phase === "review-ready") await chrome.storage.session.remove(storageKey);
+  const result = await localRequest("/progress", nfseBridgeKey, {id:remote.jobId,phase,text});
+  if (result.cancelled) await chrome.tabs.sendMessage(tabId,{type:"nfse:stop",jobId:remote.jobId}).catch(()=>{});
+  if (phase === "error" || phase === "review-ready") await chrome.storage.session.set({[remoteTerminalKey(tabId,remote.jobId)]:true});
+}
+async function remoteControl(tabId) {
+  const storageKey = "nfseRemote:" + tabId;
+  const remote = (await chrome.storage.session.get(storageKey))[storageKey];
+  if (!remote) return {active:false};
+  const {nfseBridgeKey} = await chrome.storage.local.get("nfseBridgeKey");
+  const control = await localRequest("/control",nfseBridgeKey);
+  if (control.cancelledJobId === remote.jobId) {
+    const reply = await chrome.tabs.sendMessage(tabId,{type:"nfse:stop",jobId:remote.jobId});
+    if (!reply?.stopped) return {active:true};
+    await queues.get(tabId)?.catch(()=>{});
+    await chrome.storage.session.set({
+      [key(tabId)]:{phase:"cancelled",until:0,text:"Preenchimento interrompido. Confira os dados já preenchidos no portal."},
+      [storageKey]:{...remote,cancelled:true},
+      ["nfseRemoteJob:" + remote.jobId]:"cancelled",
+    });
+    await chrome.storage.session.remove(["nfsePortal:" + tabId,"nfsePortalOwner"]);
+    await localRequest("/cancel-ack",nfseBridgeKey,{id:remote.jobId});
+    return {active:false,stopped:true};
+  }
+  if (remote.cancelled) {
+    await chrome.tabs.sendMessage(tabId,{type:"nfse:stop",jobId:remote.jobId});
+    return {active:false,stopped:true};
+  }
+  const terminal = (await chrome.storage.session.get(remoteTerminalKey(tabId,remote.jobId)))[remoteTerminalKey(tabId,remote.jobId)];
+  if (terminal && !control.jobId) {
+    await chrome.storage.session.remove(storageKey);
+    return {active:false};
+  }
+  return {active:true,jobId:remote.jobId};
 }
 async function connectRemote(message, sender) {
   const url = new URL(sender.url);
@@ -126,8 +158,9 @@ async function connectRemote(message, sender) {
   remoteInFlight.add(job.id);
   try {
     await chrome.storage.session.set({[ledger]:true,["nfseRemote:"+sender.tab.id]:{jobId:job.id}});
-    await localRequest("/ack", bridgeKey, {id:job.id});
-    const reply = await chrome.tabs.sendMessage(sender.tab.id,{type:"nfse:start",cnpj:job.invoice?.cnpj,invoice:job.invoice});
+    const ack = await localRequest("/ack", bridgeKey, {id:job.id});
+    if (ack.cancelled) { await remoteControl(sender.tab.id); return {ok:false,stopped:true}; }
+    const reply = await chrome.tabs.sendMessage(sender.tab.id,{type:"nfse:start",cnpj:job.invoice?.cnpj,invoice:job.invoice,jobId:job.id});
     if (reply?.ok) await chrome.storage.session.remove(["nfsePortal:" + sender.tab.id, "nfsePortalOwner"]);
     if (!reply?.ok) await remoteProgress(sender.tab.id,"error",reply?.error || "Abra Pessoas no portal e confira a sessão antes de enviar outra solicitação.");
     return {ok:!!reply?.ok};
@@ -137,8 +170,12 @@ async function connectRemote(message, sender) {
   } finally { remoteInFlight.delete(job.id); }
 }
 chrome.runtime.onMessage.addListener((message,sender,respond)=>{
-  if (sender.tab?.id == null || !["nfse:connect-pc","nfse:remote-result"].includes(message.type)) return;
-  const task = message.type === "nfse:connect-pc" ? connectRemote(message,sender) : (async()=>{
+  if (sender.tab?.id == null || !["nfse:connect-pc","nfse:remote-result","nfse:remote-control","nfse:manual-begin"].includes(message.type)) return;
+  const url = new URL(sender.url);
+  if (url.origin !== "https://www.nfse.gov.br" || !url.pathname.startsWith("/EmissorNacional/DPS/")) return;
+  const task = message.type === "nfse:connect-pc" ? connectRemote(message,sender) :
+    message.type === "nfse:remote-control" ? remoteControl(sender.tab.id) :
+    message.type === "nfse:manual-begin" ? chrome.storage.session.remove("nfseRemote:" + sender.tab.id).then(()=>({ok:true})) : (async()=>{
     const state=(await chrome.storage.session.get(key(sender.tab.id)))[key(sender.tab.id)];
     const url=new URL(sender.url);
     if (url.origin!=="https://www.nfse.gov.br" || !url.pathname.startsWith("/EmissorNacional/DPS/") || /\/DPS\/(?:Pessoas|Servi(?:c|ç|%c3%a7)o|Tributacao)(?:\/|$)/i.test(url.pathname)) return {ok:false};
@@ -147,6 +184,6 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     await remoteProgress(sender.tab.id,"review-ready","Deu tudo certo! A nota está pronta para conferir e emitir manualmente no PC.");
     return {ok:true};
   })();
-  task.then(respond,()=>respond({ok:false,error:"Abra o programa NFS-e Conecta no PC e tente conectar novamente."}));
+  task.then(respond,()=>respond(message.type==="nfse:remote-control"?{active:true,unavailable:true}:{ok:false,error:"Abra o programa NFS-e Conecta no PC e tente conectar novamente."}));
   return true;
 });

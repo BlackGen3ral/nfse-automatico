@@ -206,6 +206,8 @@ async function api(request, env) {
     return json({ pairCode: code, expires: now + 300000 });
   }
   if (pc && path === "/api/pc/poll" && request.method === "POST") {
+    const stopping = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND cancel_requested=1 AND state IN('claimed','running')")
+      .bind(device.id).first();
     await db
       .prepare("UPDATE devices SET last_seen=? WHERE id=?")
       .bind(now, device.id)
@@ -218,6 +220,7 @@ async function api(request, env) {
       .first();
     return json({
       paired: !!device.mobile_hash,
+      cancelJobId: stopping?.id || null,
       pairCode: device.pair_expires > now ? device.pair_code : null,
       job: job
         ? { id: job.id, invoice: JSON.parse(job.payload), expires: job.expires }
@@ -227,13 +230,13 @@ async function api(request, env) {
   if (pc && path === "/api/pc/progress" && request.method === "POST") {
     const input = await body(request);
     if (
-      !["running", "review", "error"].includes(input.state) ||
+      !["running", "review", "error", "cancelled"].includes(input.state) ||
       typeof input.id !== "string"
     )
       throw new ApiError(400, "Progresso inválido.");
     await db
       .prepare(
-        "UPDATE jobs SET state=?,message=?,payload=CASE WHEN ? IN ('review','error') THEN NULL ELSE payload END WHERE id=? AND device_id=? AND state IN ('claimed','running')",
+        "UPDATE jobs SET state=?,message=?,payload=CASE WHEN ? IN ('review','error','cancelled') THEN NULL ELSE payload END WHERE id=? AND device_id=? AND state IN ('claimed','running') AND (cancel_requested=0 OR ?='cancelled')",
       )
       .bind(
         input.state,
@@ -241,14 +244,16 @@ async function api(request, env) {
         input.state,
         input.id,
         device.id,
+        input.state,
       )
       .run();
-    return json({ ok: true });
+    const progress = await db.prepare("SELECT cancel_requested,state FROM jobs WHERE id=? AND device_id=?").bind(input.id,device.id).first();
+    return json({ ok: true, cancelRequested: !!progress?.cancel_requested && progress.state !== "cancelled" });
   }
   if (!pc && path === "/api/status" && request.method === "GET") {
     const job = await db
       .prepare(
-        "SELECT id,state,message,created FROM jobs WHERE device_id=? ORDER BY created DESC LIMIT 1",
+        "SELECT id,state,message,created,cancel_requested AS cancelRequested FROM jobs WHERE device_id=? ORDER BY created DESC LIMIT 1",
       )
       .bind(device.id)
       .first();
@@ -257,6 +262,16 @@ async function api(request, env) {
       online: now - device.last_seen < 20000,
       job,
     });
+  }
+  if (!pc && path === "/api/jobs/cancel" && request.method === "POST") {
+    const input = await body(request);
+    if (!/^[a-f0-9-]{36}$/.test(input.id || "")) throw new ApiError(400, "Solicitação inválida.");
+    const job = await db.prepare("UPDATE jobs SET cancel_requested=1,payload=NULL,message=CASE WHEN state='queued' THEN 'Preenchimento interrompido antes de iniciar.' ELSE 'Parada solicitada. Aguardando confirmação do PC e da extensão…' END,state=CASE WHEN state='queued' THEN 'cancelled' ELSE state END WHERE id=? AND device_id=? AND state IN('queued','claimed','running') RETURNING state")
+      .bind(input.id, device.id).first();
+    if (job) return json({state:job.state});
+    const existing = await db.prepare("SELECT state FROM jobs WHERE id=? AND device_id=?").bind(input.id,device.id).first();
+    if (existing?.state === "cancelled") return json({state:"cancelled"});
+    throw new ApiError(409, "Esta solicitação já terminou. Confira o resultado no PC.");
   }
   if (!pc && path === "/api/jobs" && request.method === "POST") {
     const input = await body(request),

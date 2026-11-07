@@ -8,7 +8,7 @@ const content = fs.readFileSync(
   "utf8",
 );
 const source = content.slice(content.indexOf("// Portal certificate entry"));
-async function portal(path, active, hash = "", delayed = false) {
+async function portal(path, active, hash = "", delayed = false, command = "open-invoice") {
   const actions = [];
   const events = {};
   const timers = [];
@@ -39,7 +39,7 @@ async function portal(path, active, hash = "", delayed = false) {
     window: { addEventListener(name, fn) { events[name] = fn; } },
     chrome: { runtime: {
       async sendMessage(message) {
-        if (message.type === "nfse:portal-entry") return { active };
+        if (message.type === "nfse:portal-entry") return { active, command:active ? command : null };
         actions.push(message.type);
         return { ok: true };
       },
@@ -57,6 +57,7 @@ async function portal(path, active, hash = "", delayed = false) {
 test("Entrada autorizada segue certificado, Pessoas e conexão sem repetir cliques", async () => {
   assert.deepEqual(await portal("/EmissorNacional/Login", true, "#nfse-connect=" + "a".repeat(64)), ["clear-hash", "certificate"]);
   assert.deepEqual(await portal("/EmissorNacional/", true), ["people"]);
+  assert.deepEqual(await portal("/EmissorNacional/Dashboard", true), ["people"]);
   assert((await portal("/EmissorNacional/DPS/Pessoas", true)).includes("nfse:connect-pc"));
 });
 test("Navegação exige solicitação ativa e preserva as etapas em andamento", async () => {
@@ -67,4 +68,8 @@ test("Navegação exige solicitação ativa e preserva as etapas em andamento", 
 });
 test("Acesso por certificado aguarda o botão aparecer", async () => {
   assert.deepEqual(await portal("/EmissorNacional/Login", true, "", true), ["certificate"]);
+});
+test("Dashboard só abre uma nota com comando do PC",async()=>{
+  assert.deepEqual(await portal("/EmissorNacional/Dashboard",true,"",false,null),[]);
+  assert.deepEqual(await portal("/EmissorNacional/Dashboard",true),["people"]);
 });

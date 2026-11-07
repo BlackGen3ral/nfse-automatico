@@ -10,6 +10,7 @@ let online = false,
   polling = false,
   timer,
   requestId = sessionStorage.getItem("nfseRequest") || null;
+let currentJob = null, stopping = false;
 const feedback = (text) => {
   $("feedback").textContent = text;
 };
@@ -160,13 +161,18 @@ async function refresh() {
     const job = status.job;
     if (
       job &&
-      ["review", "error"].includes(job.state) &&
+      ["review", "error", "cancelled"].includes(job.state) &&
       requestId === job.id
     ) {
       requestId = null;
       sessionStorage.removeItem("nfseRequest");
     }
     busy = !!job && ["queued", "claimed", "running"].includes(job.state);
+    currentJob = job;
+    if (job?.state === "cancelled") feedback(job.message);
+    $("stop-fill").hidden = !busy;
+    $("stop-fill").disabled = stopping || !!job?.cancelRequested;
+    $("stop-fill").textContent = stopping || job?.cancelRequested ? "Parando…" : "Parar preenchimento";
     $("progress").hidden = !job;
     if (job) {
       $("progress-title").textContent =
@@ -176,6 +182,7 @@ async function refresh() {
           running: "Preenchimento em andamento",
           review: "Tudo pronto para conferir",
           error: "Sua atenção é necessária",
+          cancelled: "Preenchimento interrompido",
         }[job.state] || "Andamento";
       $("progress-message").textContent = job.message;
       $("new-note").hidden = busy;
@@ -189,7 +196,7 @@ async function refresh() {
               ? 1
               : 0;
       Array.from($("step-track").children).forEach((el, index) =>
-        el.classList.toggle("active", job.state !== "error" && index <= phase),
+        el.classList.toggle("active", !["error","cancelled"].includes(job.state) && index <= phase),
       );
     }
     render();
@@ -201,6 +208,23 @@ async function refresh() {
     polling = false;
   }
 }
+$("stop-fill").onclick = async () => {
+  if (!currentJob || !busy || stopping) return;
+  const id = currentJob.id;
+  stopping = true;
+  $("stop-fill").disabled = true;
+  $("stop-fill").textContent = "Parando…";
+  feedback("Solicitando a interrupção ao PC…");
+  try {
+    await api("/api/jobs/cancel", {method:"POST",body:JSON.stringify({id})});
+    feedback("Parada solicitada. Aguardando a confirmação do PC e da extensão.");
+    await refresh();
+  } catch (error) {
+    feedback(error.message);
+    $("stop-fill").disabled = false;
+    $("stop-fill").textContent = "Parar preenchimento";
+  } finally { stopping = false; }
+};
 $("new-note").onclick = () => {
   requestId = null;
   sessionStorage.removeItem("nfseRequest");
