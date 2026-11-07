@@ -9,7 +9,7 @@ function engine(pathname = "/EmissorNacional/DPS/Servico") {
     .replace("const guide = createGuide();", "const guide = testGuide; globalThis.engine = {remember,conferStage,reviewExplanation,portalHealth,update};");
   const fields = new Map(), messages = [];
   const context = {
-    document:{hidden:false,querySelector:()=>null,querySelectorAll:()=>[],getElementById:id=>fields.get(id),addEventListener(){}},
+    document:{hidden:false,querySelector:()=>null,querySelectorAll:selector=>selector === 'input[type=radio]' ? [...fields.values()].filter(field=>field.type === 'radio') : [],getElementById:id=>fields.get(id),addEventListener(){}},
     location:{pathname,search:"?idr=draft-test"}, window:{addEventListener(){}}, URLSearchParams,
     chrome:{runtime:{onMessage:{addListener(){}},async sendMessage(message){messages.push(message);return null;}}},
     testGuide:{show(){},point(){},confirm(){},wait(){},restore(){}},
@@ -44,5 +44,20 @@ test("Uma troca posterior no mesmo grupo de rádio substitui a confirmação ant
   e.fields.set(no.id,no);e.fields.set(yes.id,yes);e.remember(no,true);
   no.checked=false;yes.checked=true;e.remember(yes,true);
   await e.conferStage();yes.checked=false;
+  await assert.rejects(e.conferStage(),/não manteve/);
+});
+test("Rádios com ID repetido são conferidos pelo grupo e valor, inclusive após recriação",async()=>{
+  const e=engine();
+  const yes={id:"CompraGovernamental",name:"CompraGovernamental",value:"1",type:"radio",checked:false,labels:[]};
+  const no={...yes,value:"0",checked:true};
+  e.fields.set(yes.id,yes);e.fields.set("segunda-opcao",no);
+  e.remember(no,true);
+  await e.conferStage();
+  e.fields.set("segunda-opcao",{...no});
+  no.checked=false;
+  await e.conferStage();
+  e.fields.get("segunda-opcao").checked=false;yes.checked=true;
+  await assert.rejects(e.conferStage(),/não manteve/);
+  e.fields.delete("segunda-opcao");
   await assert.rejects(e.conferStage(),/não manteve/);
 });

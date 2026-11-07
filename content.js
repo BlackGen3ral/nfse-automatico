@@ -13,9 +13,15 @@
       field.id || field.name || "Campo preenchido";
     const key = field.type === "radio" ? field.name || field.id : field.id || field.name;
     if (!key) return;
+    // O portal reutiliza o mesmo ID em opções de um grupo. O ID sozinho pode
+    // devolver a primeira opção (desmarcada) em vez daquela que foi escolhida.
+    const radio = field.type === "radio" ? {name:field.name, id:field.id, value:field.value, form:field.form} : null;
     confirmations.set(key, { label, check: () => {
+      if (radio) return Array.from(document.querySelectorAll('input[type=radio]')).some(current =>
+        (radio.name ? current.name === radio.name : current.id === radio.id) && current.value === radio.value &&
+        (!radio.form || current.form === radio.form || (radio.form.id && current.form?.id === radio.form.id)) && current.checked);
       const current = field.id ? document.getElementById(field.id) : field;
-      return !!current && (field.type === "radio" ? current.checked : /Inscricao/.test(key) ? DIGITS(current.value) === DIGITS(String(expected)) : String(current.value) === String(expected));
+      return !!current && (/Inscricao/.test(key) ? DIGITS(current.value) === DIGITS(String(expected)) : String(current.value) === String(expected));
     }});
   }
   async function conferStage() {
