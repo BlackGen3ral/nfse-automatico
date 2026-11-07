@@ -14,6 +14,71 @@ let starting = false;
 let initializing = true;
 let draftKey;
 let refreshSequence = 0;
+const savedCnpjsKey = "nfseSavedCnpjs";
+let savedCnpjs = [], savedWriting = false;
+function cleanSavedCnpjs(value) {
+  return [...new Set((Array.isArray(value) ? value : []).filter(cnpj => typeof cnpj === "string" && /^\d{14}$/.test(cnpj)))];
+}
+function savedMessage(text, error = false) {
+  const message = document.getElementById("saved-cnpj-status");
+  message.textContent = text;
+  message.dataset.error = String(error);
+  message.hidden = !text;
+}
+function renderSavedCnpjs() {
+  const blocked = input.disabled || savedWriting;
+  const saved = savedCnpjs.includes(digits(input.value));
+  const save = document.getElementById("save-cnpj");
+  save.disabled = blocked || digits(input.value).length !== 14 || saved;
+  save.textContent = saved ? "✓ Salvo" : "＋ Salvar";
+  document.getElementById("saved-cnpjs").hidden = !savedCnpjs.length;
+  document.getElementById("saved-cnpj-count").textContent = String(savedCnpjs.length);
+  const list = document.getElementById("saved-cnpj-list");
+  list.replaceChildren();
+  for (const cnpj of savedCnpjs) {
+    const item = document.createElement("li");
+    const choose = document.createElement("button");
+    choose.type = "button";
+    choose.className = "choose-cnpj";
+    choose.textContent = mask(cnpj);
+    choose.disabled = blocked;
+    choose.setAttribute("aria-label", "Usar CNPJ " + mask(cnpj));
+    choose.onclick = () => {
+      if (input.disabled || savedWriting) return;
+      input.value = mask(cnpj);
+      onDraftEdit();
+      description.focus();
+    };
+    const remove = document.createElement("button");
+    remove.type = "button";
+    remove.className = "remove-cnpj";
+    remove.textContent = "×";
+    remove.disabled = blocked;
+    remove.setAttribute("aria-label", "Remover CNPJ " + mask(cnpj));
+    remove.onclick = () => changeSavedCnpjs(cnpj, true);
+    item.append(choose, remove);
+    list.append(item);
+  }
+}
+async function changeSavedCnpjs(cnpj, remove = false) {
+  if (input.disabled || savedWriting || !/^\d{14}$/.test(cnpj)) return;
+  savedWriting = true;
+  renderSavedCnpjs();
+  try {
+    const stored = await chrome.storage.local.get(savedCnpjsKey);
+    const current = cleanSavedCnpjs(stored[savedCnpjsKey]);
+    const next = remove ? current.filter(value => value !== cnpj) : [...new Set([...current, cnpj])];
+    await chrome.storage.local.set({[savedCnpjsKey]: next});
+    savedCnpjs = next;
+    savedMessage(remove ? "CNPJ removido da lista." : "CNPJ salvo neste navegador.");
+  } catch {
+    savedMessage("Não foi possível alterar os CNPJs salvos. Tente novamente.", true);
+  } finally {
+    savedWriting = false;
+    renderSavedCnpjs();
+  }
+}
+document.getElementById("save-cnpj").onclick = () => changeSavedCnpjs(digits(input.value));
 async function closePanel() {
   try {
     const current = await chrome.windows.getCurrent();
@@ -82,6 +147,7 @@ function renderButton() {
   }
   button.disabled = initializing || busy || starting ||
     (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14 || !invoiceData()));
+  renderSavedCnpjs();
 }
 function show(message, error = false) {
   status.textContent = message;
@@ -133,10 +199,35 @@ amount.addEventListener("input", () => {
   onDraftEdit();
 });
 for (const choice of suspensionChoices) choice.addEventListener("change", onDraftEdit);
+for (const field of [input, description, amount]) field.addEventListener("keydown", event => {
+  if (event.key !== "Enter" || event.isComposing || event.altKey || event.shiftKey || field.disabled) return;
+  if (field === description) {
+    if (!event.ctrlKey && !event.metaKey) return;
+    event.preventDefault();
+    amount.focus();
+    return;
+  }
+  if (event.ctrlKey || event.metaKey) return;
+  event.preventDefault();
+  if (field === input) {
+    if (digits(input.value).length === 14) description.focus();
+    else show("Complete os 14 números do CNPJ antes de continuar.");
+  } else if (!serviceAmount()) {
+    showAmountHint();
+    show("Informe um valor maior que zero antes de continuar.");
+  } else if (!description.value.trim()) description.focus();
+  else if (digits(input.value).length !== 14) input.focus();
+  else if (!button.disabled) button.focus();
+});
 
 async function initialize() {
   renderButton();
+  try {
+    const stored = await chrome.storage.local.get(savedCnpjsKey);
+    savedCnpjs = cleanSavedCnpjs(stored[savedCnpjsKey]);
+  } catch { savedMessage("Não foi possível carregar os CNPJs salvos.", true); }
   await refresh();
+  if (!input.disabled && peopleUrl.test(tab?.url || "")) input.focus({preventScroll:true});
 }
 async function refresh() {
   const sequence = ++refreshSequence;
@@ -225,6 +316,11 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
   }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
+  if (area === "local" && changes[savedCnpjsKey]) {
+    savedCnpjs = cleanSavedCnpjs(changes[savedCnpjsKey].newValue);
+    renderSavedCnpjs();
+    return;
+  }
   if (area !== "session" || initializing) return;
   if (draftKey && changes[draftKey] && !changes[draftKey].newValue) {
     for (const field of [input, description, amount]) field.value = "";

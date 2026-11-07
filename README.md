@@ -26,6 +26,10 @@ A extensão relê os campos que alterou antes de avançar. Se uma seleção, res
 
 ## Instalação
 
+O painel coloca o foco no CNPJ ao abrir em Pessoas. Enter no CNPJ leva à descrição; na descrição, Enter mantém a quebra de linha e Ctrl+Enter leva ao valor. Enter no valor coloca o foco no botão de preenchimento, sem iniciar sozinho.
+
+Use **＋ Salvar** ao lado do CNPJ para adicioná-lo à lista local deste navegador. Clique em um CNPJ salvo para usá-lo e continuar na descrição; use o × para removê-lo da lista. A lista permanece após fechar o painel ou o navegador e não é enviada ao GitHub. A escolha não inicia o preenchimento automaticamente.
+
 1. Baixe o ZIP e extraia para uma pasta fixa. Se você já instalou a versão anterior, copie os arquivos para a pasta que o navegador já usa.
 2. Abra `chrome://extensions` ou `edge://extensions`, ative o **Modo do desenvolvedor** e use **Carregar sem compactação**. Se já estava instalada na mesma pasta, clique em **Recarregar**.
 3. Abra ou atualize a etapa **Pessoas** no portal.
