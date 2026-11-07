@@ -72,7 +72,7 @@ function renderButton() {
   const withoutCnpj = inService || inValues;
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
-  if (busy || starting) document.querySelector("#fill-label").textContent = "Preenchendo nota…";
+  if (busy || starting) document.querySelector("#fill-label").textContent = starting ? "Preparando sua nota…" : "Preenchendo nota…";
   for (const field of [input, description, amount, ...suspensionChoices]) {
     field.disabled = withoutCnpj || initializing || busy || starting;
   }

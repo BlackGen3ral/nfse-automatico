@@ -53,6 +53,7 @@
     element.dispatchEvent(new Event("input", { bubbles: true }));
     element.dispatchEvent(new Event("change", { bubbles: true }));
     element.dispatchEvent(new Event("blur", { bubbles: true }));
+    if (element.value === next) guide.confirm(element);
     return true;
   }
 
@@ -86,6 +87,7 @@
       guide.point(result, true);
       result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, button: 0 }));
       guide.point(opener);
+      if (element.value === option.value) guide.confirm(opener);
       return element.value === option.value;
     }
     return setNativeValue(element, option.value) && element.value === option.value;
@@ -144,6 +146,7 @@
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
         guide.point(control);
         await waitFor(label + " · seleção", selected);
+        guide.confirm(control);
         return;
       }
       throw new Error(label + " · resultado");
@@ -183,6 +186,7 @@
       label?.click();
     }
     if (!radio.checked) radio.click();
+    if (radio.checked) guide.confirm(radio);
     return radio.checked;
   }
 
@@ -274,11 +278,21 @@
         .robot{filter:drop-shadow(0 5px 8px #001c1b80)}
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
+        .journey[hidden]{display:none!important}
+        .journey{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));padding:10px 16px;border:1px solid #a6efc55c;border-radius:14px;background:linear-gradient(120deg,#153f33f5,#0b251ff5);box-shadow:0 8px 25px #001a1633;color:#e6f7ee;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
+        .journey ol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0;padding:0;border:0;background:none}
+        .journey li{display:flex;justify-content:center;align-items:center;gap:6px;padding:3px;font-size:11px}
+        .journey li:before{display:none}
+        .journey li span{flex:none;width:20px;height:20px;margin:0;font-size:10px;border-radius:7px}
+        .journey p{margin:7px 0 0;text-align:center;font-size:11px;color:#bce5ce;overflow-wrap:anywhere}
+        .card[data-mood=error]{border-color:#e9c07d80}
+        @media(max-width:440px){.journey{padding:8px}.journey li{gap:3px;font-size:10px}}
       </style>
       <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
       <div class="target" aria-hidden="true"></div>
       <svg class="cursor" data-cursor xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
       <div class="click" aria-hidden="true"></div>
+      <section class="journey" hidden aria-label="Etapas do preenchimento"><ol><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol><p role="status" aria-live="polite">Preparando sua nota…</p></section>
       <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
           <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
@@ -290,6 +304,8 @@
         <p class="dismiss-countdown" aria-live="off"></p>
       </section>`;
     const card = root.querySelector(".card");
+    const journey = root.querySelector(".journey");
+    const journeyText = journey.querySelector("p");
     const message = root.querySelector(".message");
     const title = root.querySelector("h2");
     const ring = root.querySelector(".target");
@@ -340,16 +356,24 @@
         clearInterval(dismissTimer);
         phase = next; baseText = text;
         shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
-        if (next !== "review-ready") {
+        const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
+        journey.hidden = next === "error" || next === "review-ready";
+        journeyText.textContent = text;
+        journey.querySelectorAll("li").forEach((item, i) => {
+          item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
+          item.querySelector("span").textContent = i < index ? "✓" : String(i + 1);
+          if (i === index) item.setAttribute("aria-current", "step"); else item.removeAttribute("aria-current");
+        });
+        if (next !== "review-ready" && next !== "error") {
           card.hidden = true;
           if (!["people", "service", "values", "waiting"].includes(next)) clearTarget();
-          if (next === "error") host.remove(); else attach();
+          attach();
           return;
         }
         card.hidden = false; attach(); message.textContent = text;
         const countdown = root.querySelector(".dismiss-countdown");
-        const closeAt = Date.now() + 7000;
-        countdown.textContent = "Fechando em 7 s…";
+        const closeAt = Date.now() + 10000;
+        countdown.textContent = "Fechando em 10 s…";
         dismissTimer = setInterval(() => {
           const seconds = Math.max(0, Math.ceil((closeAt - Date.now()) / 1000));
           if (!seconds) {
@@ -357,23 +381,28 @@
             host.remove(); clearTarget();
           } else countdown.textContent = "Fechando em " + seconds + " s…";
         }, 1000);
-        const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
         const stage = next === "error" ? "error" : next === "review-ready" ? "review" : String(index);
         if (lastStage !== null && stage !== lastStage && !reduced()) {
           message.animate?.([{opacity:.3,transform:"translateY(4px)"},{opacity:1,transform:"translateY(0)"}],{duration:240,easing:"ease-out"});
         }
         lastStage = stage;
         card.dataset.mood = next === "error" ? "error" : next === "review-ready" ? "review" : "working";
-        title.textContent = next === "error" ? "Preciso da sua ajuda" : next === "review-ready" ? "Agora é com você!" : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
-        root.querySelectorAll("li").forEach((item,i) => {
+        title.textContent = next === "error" ? "Ficou algo pendente" : next === "review-ready" ? "Deu tudo certo! Agora é com você." : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
+        card.querySelectorAll("li").forEach((item,i) => {
           item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
           item.querySelector("span").textContent = i < index ? "✓" : String(i+1);
           if (i === index) item.setAttribute("aria-current","step"); else item.removeAttribute("aria-current");
         });
         if (next === "error" || next === "review-ready" || next === "review") clearTarget();
       },
-      wait(label) { if (host.isConnected && phase !== "error") message.textContent = "Aguardando o portal · " + label; },
-      restore() { message.textContent = baseText; },
+      wait(label) { if (host.isConnected && phase !== "error") journeyText.textContent = "Aguardando o portal · " + label; },
+      restore() { journeyText.textContent = baseText; },
+      confirm(element) {
+        this.point(element);
+        if (ring.style.display === "block" && !reduced()) {
+          ring.animate?.([{boxShadow:"0 0 0 0 #4ee79a80"},{boxShadow:"0 0 0 8px #4ee79a20"},{boxShadow:"0 0 0 4px #3bc28420"}], {duration:420,easing:"ease-out"});
+        }
+      },
       point(element, clicked = false) {
         if (dismissed || phase === "error" || phase === "review-ready" || !element) return;
         attach();
@@ -712,7 +741,7 @@
       const state = await chrome.runtime.sendMessage({type:"nfse:status"});
       if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
           state.visualDraft === draftId() && !document.querySelector("input[type=password]")) {
-        guide.show("review-ready", "Nota pronta para conferir. Revise os dados e confirme a emissão no portal.");
+        guide.show("review-ready", "Preenchimento concluído. Confira os dados e confirme a emissão no portal.");
       }
       return;
     }

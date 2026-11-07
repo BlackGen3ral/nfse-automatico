@@ -104,7 +104,7 @@ input:focus,textarea:focus{background:#fff;border-color:#348c63}input,textarea{t
 #fill:not(:disabled) .arrow > span { animation: fill-arrow 3.2s ease-in-out infinite; }
 #fill:hover:not(:disabled), #fill:focus-visible:not(:disabled) { box-shadow: 0 5px 15px #0b5c3438; }
 #fill[aria-busy="true"] { color: #fff; background: #086549; cursor: progress; }
-#fill[aria-busy="true"]::before { animation: fill-sheen 1.6s ease-in-out infinite; }
+#fill[aria-busy="true"]::before { animation: fill-launch 1.6s ease-in-out infinite; }
 #fill[aria-busy="true"] .arrow > span { visibility: hidden; animation: none; }
 #fill[aria-busy="true"] .arrow::after {
   content: "";
@@ -185,3 +185,5 @@ h1 { overflow-wrap: anywhere; }
   #fill { font-size: 14px; padding-left: 12px; }
 }
 @media (max-width: 280px) { ol { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+
+@keyframes fill-launch { from { transform:translateX(-110%); } to { transform:translateX(110%); } }
