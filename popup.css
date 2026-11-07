@@ -131,3 +131,57 @@ input:focus,textarea:focus{background:#fff;border-color:#348c63}input,textarea{t
   #fill::before, #fill:not(:disabled)::before, #fill[aria-busy="true"]::before { animation: none; opacity: 0; }
   #fill:not(:disabled) .arrow > span, #fill[aria-busy="true"] .arrow::after { animation: none; }
 }
+
+/* O conteúdo se reorganiza conforme a largura da lateral. */
+main > *, .dock-inner { max-width: 1040px; margin-inline: auto; }
+.customer-fields, .description-fields, .money { min-width: 0; }
+input, textarea { min-width: 0; }
+.hero > div { min-width: 0; }
+h1 { overflow-wrap: anywhere; }
+.footer-meta { flex-wrap: wrap; }
+.update-state { overflow-wrap: anywhere; }
+.footer-meta > a { flex-shrink: 0; }
+@media (min-width: 540px) {
+  main { padding: 20px 24px; }
+  .hero { padding-inline: 24px; }
+  form { padding: 20px; }
+  .portal-access { margin-bottom: 12px; }
+  .portal-access a { min-height: 40px; }
+  ol { margin-bottom: 14px; }
+  li { min-height: 34px; font-size: 12px; }
+  input { min-height: 40px; }
+  textarea { min-height: 150px; max-height: 45vh; }
+  .action-dock { padding-inline: 24px; }
+}
+@media (min-width: 720px) {
+  :root { font-size: 15px; }
+  main { padding: 24px 28px; }
+  .hero { padding: 18px max(28px, calc((100vw - 1040px) / 2)); }
+  h1 { font-size: 25px; }
+  #people-fields {
+    display: grid;
+    grid-template-columns: minmax(0, .9fr) minmax(0, 1.1fr);
+    grid-template-areas: "intro intro" "customer description" "details description";
+    column-gap: 28px;
+    row-gap: 20px;
+  }
+  .form-intro { grid-area: intro; margin-bottom: 0; padding-bottom: 16px; }
+  .customer-fields { grid-area: customer; }
+  .description-fields { grid-area: description; display: flex; flex-direction: column; }
+  .description-fields textarea { flex: 1; width: 100%; min-height: 240px; max-height: 55vh; margin-bottom: 0; }
+  .invoice-details { grid-area: details; grid-template-columns: minmax(0, 1fr); gap: 20px; align-content: start; }
+  #hint { margin-bottom: 0; }
+  label, legend { font-size: 13px; }
+  .choice-buttons span { min-height: 40px; }
+  .action-dock { padding: 16px 28px; }
+}
+@media (max-width: 340px) {
+  .hero { grid-template-columns: 32px minmax(0, 1fr); }
+  .hero img { width: 32px; height: 32px; }
+  .version { grid-column: 2; justify-self: start; }
+  .field-total { font-size: 8px; }
+  .label-row { flex-wrap: wrap; }
+  li { gap: 3px; font-size: 10px; }
+  #fill { font-size: 14px; padding-left: 12px; }
+}
+@media (max-width: 280px) { ol { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
