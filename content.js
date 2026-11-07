@@ -109,6 +109,10 @@
   }
 
   async function searchSelect2(label, id, wanted, terms) {
+    return recoverStep(label, () => searchSelect2Attempt(label, id, wanted, terms));
+  }
+
+  async function searchSelect2Attempt(label, id, wanted, terms) {
     const field = () => document.getElementById(id);
     const selection = () => document.getElementById("select2-" + id + "-container")?.closest(".select2-selection");
     const selected = () => {
@@ -140,7 +144,7 @@
           return Array.from(list?.querySelectorAll("li[aria-selected], li.select2-results__option--selectable") || [])
             .find((item) => visible(item) && item.getAttribute("aria-disabled") !== "true" &&
               select2LabelMatches(item.textContent, wanted));
-        }, 4500).catch(() => null);
+        }, 4500).catch((error) => { if (!error.retryable) throw error; return null; });
         if (!result) continue;
         guide.point(result, true);
         result.dispatchEvent(new MouseEvent("mouseup", { bubbles: true, cancelable: true, button: 0 }));
@@ -149,7 +153,7 @@
         guide.confirm(control);
         return;
       }
-      throw new Error(label + " · resultado");
+      throw portalFailure(label + " · resultado");
     } finally {
       if (control.getAttribute("aria-expanded") === "true") {
         pressWidgetKey(control, "Escape", 27);
@@ -277,6 +281,7 @@
         .card[data-mood=review]{border-color:#a7efc780;box-shadow:0 18px 55px #00170f59,0 0 25px #80d7a21a}.card[data-mood=review]:before,.card[data-mood=error]:before{animation:none;opacity:0}
         .robot{filter:drop-shadow(0 5px 8px #001c1b80)}
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
+        .retry[hidden]{display:none!important}.retry{display:block;margin:0 16px 12px;padding:9px 12px;border-color:#94dfb755;background:#1b5b43;color:#edfff4;cursor:pointer}
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
         .journey[hidden]{display:none!important}
         .journey{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));padding:10px 16px;border:1px solid #a6efc55c;border-radius:14px;background:linear-gradient(120deg,#153f33f5,#0b251ff5);box-shadow:0 8px 25px #001a1633;color:#e6f7ee;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
@@ -301,9 +306,12 @@
         </div>
         <p class="message" role="status" aria-live="polite"></p>
         <ol aria-label="Progresso"><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol>
+        <button type="button" class="retry" hidden>Tentar novamente nesta etapa</button>
         <p class="dismiss-countdown" aria-live="off"></p>
       </section>`;
     const card = root.querySelector(".card");
+    const retry = root.querySelector(".retry");
+    retry.onclick = () => { retry.disabled = true; retryCurrentStage().catch((error) => guide.show("error", error.message)).finally(() => { retry.disabled = false; }); };
     const journey = root.querySelector(".journey");
     const journeyText = journey.querySelector("p");
     const message = root.querySelector(".message");
@@ -355,6 +363,7 @@
       show(next, text) {
         clearInterval(dismissTimer);
         phase = next; baseText = text;
+        retry.hidden = next !== "error" || !(servicePath.test(location.pathname) || valuesPath.test(location.pathname));
         shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
         const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
         journey.hidden = next === "error" || next === "review-ready";
@@ -435,7 +444,7 @@
       type: "nfse:update",
       state: {
         phase, text, valuesDraft, invoice, invoiceDraft, retryStep, visualDraft: draftId(),
-        until: Date.now() + (valuesDraft || retryStep ? 1800000 : 120000)
+        until: Date.now() + (valuesDraft || retryStep || invoice ? 1800000 : 120000)
       }
     });
   }
@@ -447,6 +456,15 @@
       (invoice.issqnSuspended === undefined || typeof invoice.issqnSuspended === "boolean");
   }
 
+  function validationMessage(form, stageName) {
+    const health = portalHealth();
+    if (health) return health.message;
+    const field = Array.from(form.elements).find((item) => !item.disabled && (visible(item) || visible(document.getElementById(item.id + "_chosen"))) &&
+      (item.validity?.valid === false || item.classList.contains("input-validation-error")));
+    const label = Array.from(field?.labels || []).map((item) => item.textContent.trim()).find(Boolean);
+    return label ? "Confira o campo " + label.slice(0, 120) + " na etapa " + stageName : "Confira os campos obrigatórios da etapa " + stageName;
+  }
+
   function advanceButton(fieldId, stagePath, stageName) {
     const field = document.getElementById(fieldId);
     const form = field?.form || field?.closest("form");
@@ -455,7 +473,7 @@
       visible(element) && !element.disabled && norm(element.textContent || element.value) === "avancar");
     if (buttons.length !== 1) throw new Error("Botão Avançar da etapa " + stageName);
     if (!form.checkValidity() || form.querySelector("input.input-validation-error, select.input-validation-error, textarea.input-validation-error")) {
-      throw new Error("Campos obrigatórios da etapa " + stageName);
+      throw new Error(validationMessage(form, stageName));
     }
     return buttons[0];
   }
@@ -470,20 +488,70 @@
     }, 25000);
   }
 
+  function portalHealth() {
+    const alerts = Array.from(document.querySelectorAll(".alert-danger,.alert-warning,.validation-summary-errors li,.field-validation-error"))
+      .filter(visible).map((item) => (item.innerText || item.textContent || "").trim()).filter(Boolean);
+    const text = alerts.join(" · ").slice(0, 300);
+    if (visible(document.querySelector("input[type=password]")) || /sessao.*(?:expir|encerr)|autenticacao.*necess|faca.*login/.test(norm(text))) {
+      return { kind: "session", message: "A sessão do portal expirou. Entre novamente e abra o mesmo rascunho para continuar." };
+    }
+    if (Array.from(document.querySelectorAll("iframe[src*=recaptcha],iframe[src*=hcaptcha],[id*=captcha] input")).some(visible)) {
+      return { kind: "captcha", message: "O portal solicitou uma verificação. Conclua-a manualmente para continuar." };
+    }
+    if (text) {
+      const hasFieldError = Array.from(document.querySelectorAll(".validation-summary-errors li,.field-validation-error")).some((item) => visible(item) && item.textContent.trim());
+      const transient = !hasFieldError && /temporari|indisponiv|tente novamente|nao foi possivel recuperar|erro de conexao|falha de conexao/.test(norm(text));
+      return { kind: transient ? "transient" : "validation", message: text };
+    }
+    return null;
+  }
+
+  function portalFailure(label) {
+    const health = portalHealth();
+    const error = new Error(health ? health.message : "O portal não confirmou: " + label);
+    error.kind = health?.kind || "timeout";
+    error.retryable = error.kind === "timeout" || error.kind === "transient";
+    return error;
+  }
+
+  async function recoverStep(label, action) {
+    try { return await action(); }
+    catch (error) {
+      const health = portalHealth();
+      if (!error.retryable || (health && !["transient"].includes(health.kind))) throw error;
+      guide.wait("Recuperando " + label + " · nova tentativa 1 de 1");
+      await new Promise((resolve) => setTimeout(resolve, 600));
+      const blocked = portalHealth();
+      if (blocked && blocked.kind !== "transient") throw portalFailure(label);
+      try { return await action(); } finally { guide.restore(); }
+    }
+  }
+
   async function waitFor(label, predicate, timeout = 7500) {
-    const deadline = Date.now() + timeout;
+    let deadline = Date.now() + timeout;
     const startedAt = Date.now();
-    let waitingShown = false;
+    let waitingShown = false, extended = false, checkedAt = -Infinity;
     do {
+      if (Date.now() - checkedAt >= 400) {
+        checkedAt = Date.now();
+        const health = portalHealth();
+        if (health && ["session", "captcha"].includes(health.kind)) throw portalFailure(label);
+      }
       const result = predicate();
       if (result) { if (waitingShown) guide.restore(); return result; }
       if (!waitingShown && Date.now() - startedAt > 1300) { guide.wait(label); waitingShown = true; }
-      // Reage mais cedo aos controles que o portal libera logo após a seleção.
       const interval = Date.now() - startedAt < 1500 ? 60 : 140;
       await new Promise((resolve) => setTimeout(resolve, interval));
+      if (Date.now() >= deadline && !extended) {
+        const health = portalHealth();
+        if (health && health.kind !== "transient") throw portalFailure(label);
+        extended = true; deadline += 3000;
+        guide.wait("O portal está demorando · conferindo " + label);
+        waitingShown = true;
+      }
     } while (Date.now() < deadline);
     if (waitingShown) guide.restore();
-    throw new Error(label);
+    throw portalFailure(label);
   }
 
   function panel(id) {
@@ -522,6 +590,8 @@
       return visible(candidate) && !candidate.disabled && candidate;
     });
     let nameWasCleared = !previousName || !lookupName(scope(), stem);
+    await recoverStep(label + " · pesquisa", async () => {
+    if (!button.isConnected || button.disabled || DIGITS(field()?.value) !== cnpj) throw portalFailure(label + " · pesquisa indisponível");
     guide.point(button, true);
     button.click();
     await waitFor(label + " · resultado da pesquisa", () => {
@@ -530,6 +600,7 @@
       return DIGITS(field()?.value) === cnpj && name &&
         (previousCnpj === cnpj || nameWasCleared || name !== previousName);
     }, 12000);
+    });
   }
 
   async function prepareIssuer() {
@@ -591,7 +662,7 @@
     const form = next?.form || next?.closest("form");
     if (!peoplePath.test(location.pathname) || !visible(next) || next.disabled || !form) throw new Error("Botão Avançar");
     if (!form.checkValidity() || form.querySelector("input.input-validation-error, select.input-validation-error, textarea.input-validation-error")) {
-      throw new Error("Campos obrigatórios da etapa Pessoas");
+      throw new Error(validationMessage(form, "Pessoas"));
     }
 
     const armed = await update("waiting", "Pessoas preenchida. Abrindo a etapa Serviço…", {
@@ -608,7 +679,7 @@
   }
 
   async function fillService(invoice = null) {
-    await update("service", "Preenchendo Serviço…");
+    await update("service", "Preenchendo Serviço…", { invoice, invoiceDraft: invoice ? draftId() : null });
     const scope = document.querySelector("main, #main-content") || document;
     const select = (label, id, value) => waitFor(label, () => selectOption(document.getElementById(id), value), 12000);
     const issues = [];
@@ -672,7 +743,7 @@
   }
 
   async function fillValues(invoice = null) {
-    await update("values", "Preenchendo Valores…");
+    await update("values", "Preenchendo Valores…", { invoice, invoiceDraft: invoice ? draftId() : null });
     const issues = [];
     async function attempt(step) {
       try { await step(); return true; }
@@ -730,9 +801,29 @@
 
   function report(error, invoice = null) {
     const draft = invoice && draftId();
-    return update("error", "Confira no portal: " + error.message + ".", draft ? {
-      invoice, invoiceDraft: draft, retryStep: valuesPath.test(location.pathname) ? "values" : "service"
+    const health = portalHealth();
+    const detail = health?.message || error.message;
+    return update("error", "Não consegui concluir. " + detail, draft ? {
+      invoice, invoiceDraft: draft, retryStep: peoplePath.test(location.pathname) ? "people" : valuesPath.test(location.pathname) ? "values" : "service"
     } : {});
+  }
+
+  async function retryCurrentStage() {
+    if (running) return;
+    const inValues = valuesPath.test(location.pathname);
+    if (!inValues && !servicePath.test(location.pathname)) return;
+    const health = portalHealth();
+    if (health && ["session", "captcha"].includes(health.kind)) throw portalFailure("Retomada");
+    const state = await chrome.runtime.sendMessage({type:"nfse:status"});
+    if (state?.phase !== "error" || state.until <= Date.now() || !draftId() || state.visualDraft !== draftId() ||
+        (state.invoice && (state.invoiceDraft !== draftId() || !validInvoice(state.invoice)))) {
+      throw new Error("Abra o painel da extensão para iniciar nesta nota. Não há uma recuperação válida para este rascunho.");
+    }
+    const invoice = state.invoice || null;
+    running = true;
+    try { await (inValues ? fillValues(invoice) : fillService(invoice)); }
+    catch (error) { await report(error, invoice); }
+    finally { running = false; }
   }
 
   async function resume() {
@@ -749,9 +840,19 @@
     running = true;
     let invoice = null;
     try {
-      const flow = await chrome.runtime.sendMessage({ type: inValues ? "nfse:claim-values" : "nfse:claim" });
+      let flow = await chrome.runtime.sendMessage({ type: inValues ? "nfse:claim-values" : "nfse:claim" });
+      if (!flow) flow = await chrome.runtime.sendMessage({ type: "nfse:recover" });
+      if (flow?.recovered && !validInvoice(flow.invoice)) throw new Error("Os dados guardados não permitem retomar este rascunho. Abra o painel da extensão.");
+      if (flow?.recovered) showStatus(inValues ? "values" : "service", "Retomando o mesmo rascunho após a interrupção…");
       invoice = validInvoice(flow?.invoice) ? flow.invoice : null;
       if (flow) await (inValues ? fillValues(invoice) : fillService(invoice));
+      else {
+        const state = await chrome.runtime.sendMessage({type:"nfse:status"});
+        if (state?.phase === "error" && state.until > Date.now() && state.visualDraft === draftId()) guide.show("error", state.text);
+        else if (["service", "values"].includes(state?.phase) && state.visualDraft === draftId() && state.until > Date.now()) {
+          await report(new Error("A retomada automática não está disponível. Confira os dados e use Tentar novamente nesta etapa"), validInvoice(state.invoice) ? state.invoice : null);
+        }
+      }
     } catch (error) {
       await report(error, invoice);
     } finally {
@@ -785,7 +886,7 @@
     running = true;
     let replied = false;
     (async () => {
-      const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…");
+      const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…", { invoice: message.invoice, invoiceDraft: draftId() });
       if (!state) throw new Error("Início do preenchimento");
       showStatus("people", "Conferindo os dados do emitente…");
       await prepareIssuer();
@@ -796,7 +897,7 @@
       await fillPeople(message.cnpj, message.invoice);
     })().catch(async (error) => {
       if (!replied) respond({ ok: false, error: error.message });
-      await report(error);
+      await report(error, message.invoice);
     }).finally(() => {
       running = false;
       resume().catch(() => {});

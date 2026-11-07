@@ -49,3 +49,11 @@ powershell.exe -NoProfile -ExecutionPolicy Bypass -File .\atualizador\desativar.
 ## Validação no portal
 
 Os controles foram identificados no Emissor Nacional. A busca, a seleção, o preenchimento da descrição e do valor e a transição até a revisão foram verificados com formulários simulados.
+
+## Leitura do portal e recuperação
+
+O assistente identifica avisos de validação, sessão expirada e verificações CAPTCHA visíveis. Esperas por campos e resultados podem ganhar até 3 segundos adicionais. Pesquisas de CNPJ e buscas Select2 podem repetir uma vez quando a falha é temporária; erros de validação e autenticação não são repetidos automaticamente.
+
+Descrição e valor do fluxo ficam na sessão da guia. Após uma interrupção ou recarga em Serviço ou Valores, a extensão pode retomar o mesmo rascunho ativo, com limite de duas retomadas automáticas por rascunho. O botão Tentar novamente nesta etapa permite repetir o preenchimento de um rascunho com erro, depois de corrigir o problema. Troca de rascunho, dados vencidos e etapas de avanço pendentes bloqueiam a retomada automática. A extensão não atualiza a página, não faz login, não resolve CAPTCHA e não confirma emissão.
+
+Esses cenários foram verificados em formulários simulados; a leitura depende dos avisos e controles que o portal apresentar.
