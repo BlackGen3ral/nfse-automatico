@@ -9,23 +9,16 @@
 <body>
   <header class="hero">
     <div class="app-icon"><img src="icons/icon-48.png" alt="" width="36" height="36"></div>
-    <div class="brand-copy"><p class="eyebrow">ASSISTENTE DE EMISSÃO</p><h1>NFS-e Automático</h1></div>
+    <div class="brand-copy"><h1>NFS-e Automático</h1><nav class="portal-access" aria-label="Acesso ao Emissor Nacional"><a class="certificate-access" href="https://certificado.nfse.gov.br/EmissorNacional/Certificado" target="_blank" rel="noreferrer">Entrar com certificado <span aria-hidden="true">↗</span></a></nav></div>
     <span id="version" class="version"></span>
   </header>
   <main>
-    <nav class="portal-access" aria-label="Acesso ao Emissor Nacional">
-      <a class="certificate-access" href="https://certificado.nfse.gov.br/EmissorNacional/Certificado" target="_blank" rel="noreferrer">
-        <span class="certificate-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true"><rect x="4" y="3" width="16" height="12" rx="2"/><path d="M8 7h8m-8 4h4m2 4v6l2-1.5 2 1.5v-6"/></svg></span>
-        <span class="certificate-copy"><small>EMISSOR NACIONAL</small><span>Entrar com certificado</span></span><span class="external" aria-hidden="true">↗</span>
-      </a>
-    </nav>
-    <div class="workflow-heading"><span>DO PREENCHIMENTO À REVISÃO</span><span id="portal-state" class="portal-state">Aguardando portal</span></div>
     <ol aria-label="Etapas" class="steps">
       <li id="people"><span>1</span>Pessoas</li><li id="service"><span>2</span>Serviço</li><li id="values"><span>3</span>Valores</li><li id="review"><span>4</span>Revisão</li>
     </ol>
     <form id="fill-form">
       <div id="people-fields">
-        <div class="form-intro"><div><span class="section-kicker">PREENCHIMENTO ASSISTIDO</span><h2>Dados da nota</h2></div><span class="draft-tag"><span aria-hidden="true">◌</span> Rascunho</span></div>
+        <div class="form-intro"><h2>Dados da nota</h2><span id="portal-state" class="portal-state">Aguardando portal</span></div>
         <div class="customer-fields">
         <label for="cnpj">CNPJ do tomador</label>
         <input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="00.000.000/0000-00" required aria-describedby="hint">
