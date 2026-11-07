@@ -283,21 +283,25 @@
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
         .retry[hidden]{display:none!important}.retry{display:block;margin:0 16px 12px;padding:9px 12px;border-color:#94dfb755;background:#1b5b43;color:#edfff4;cursor:pointer}
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#add4c0;font-variant-numeric:tabular-nums}
-        .journey[hidden]{display:none!important}
-        .journey{position:fixed;top:12px;left:50%;transform:translateX(-50%);width:min(640px,calc(100vw - 32px));padding:10px 16px;border:1px solid #a6efc55c;border-radius:14px;background:linear-gradient(120deg,#153f33f5,#0b251ff5);box-shadow:0 8px 25px #001a1633;color:#e6f7ee;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
-        .journey ol{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:6px;margin:0;padding:0;border:0;background:none}
-        .journey li{display:flex;justify-content:center;align-items:center;gap:6px;padding:3px;font-size:11px}
-        .journey li:before{display:none}
-        .journey li span{flex:none;width:20px;height:20px;margin:0;font-size:10px;border-radius:7px}
-        .journey p{margin:7px 0 0;text-align:center;font-size:11px;color:#bce5ce;overflow-wrap:anywhere}
+        .worker[hidden]{display:none!important}
+        .worker{position:relative;display:flex;align-items:center;gap:10px;width:min(280px,calc(100vw - 36px));padding:10px 14px;border:1px solid #8ed8ad66;border-radius:18px;background:linear-gradient(135deg,#1c4c3df5,#0c2921f5);box-shadow:0 10px 30px #001a1638;color:#e6f7ee;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
+        .worker-avatar{position:relative;flex:0 0 78px;height:80px}
+        .worker .hand{animation:work-arm .8s ease-in-out infinite}
+        .worker .arm-left{animation:work-left .9s ease-in-out infinite}
+        .worker[data-waiting=true] .hand,.worker[data-waiting=true] .arm-left{animation-duration:2s}
+        .worker-copy{min-width:0}.worker strong{display:block;font-size:12px;color:#e5ffed}.worker p{margin:5px 0 0;color:#b6ddc7;font-size:11px;overflow-wrap:anywhere}
+        .workstation{position:absolute;left:30px;top:45px;width:39px;height:26px;border:2px solid #94d9ae;border-radius:4px;background:#092c24;box-shadow:0 3px 6px #001a1640;transform:rotate(-5deg)}
+        .workstation:before{content:"";position:absolute;inset:5px;background:repeating-linear-gradient(0deg,#88eebd 0 2px,transparent 2px 5px);opacity:.6;animation:typing-screen 1.4s ease-in-out infinite}
+        .workstation:after{content:"";position:absolute;left:-5px;bottom:-6px;width:45px;height:5px;border-radius:0 0 5px 5px;background:#a6dfbb;border-bottom:2px solid #4c9471}
+        @keyframes typing-screen{50%{opacity:.95}}
+        .cursor,.click{z-index:2}
         .card[data-mood=error]{border-color:#e9c07d80}
-        @media(max-width:440px){.journey{padding:8px}.journey li{gap:3px;font-size:10px}}
       </style>
       <svg class="shade" data-shade aria-hidden="true" xmlns="http://www.w3.org/2000/svg"><path fill="#00150e" fill-opacity=".2" fill-rule="evenodd"/></svg>
       <div class="target" aria-hidden="true"></div>
       <svg class="cursor" data-cursor xmlns="http://www.w3.org/2000/svg" width="32" height="40" viewBox="0 0 32 40" aria-hidden="true"><path d="M4 3L28 30L13 28L4 37Z" fill="#040c2e" stroke="#d9f6f5" stroke-width="2.6" stroke-linejoin="round"/><path d="M4 3L13 28L4 37Z" fill="#003047"/></svg>
       <div class="click" aria-hidden="true"></div>
-      <section class="journey" hidden aria-label="Etapas do preenchimento"><ol><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol><p role="status" aria-live="polite">Preparando sua nota…</p></section>
+      <section class="worker" hidden aria-label="Robô trabalhando"><div class="worker-avatar" aria-hidden="true"></div><div class="worker-copy"><strong>Preparando sua nota</strong><p role="status" aria-live="polite"></p></div></section>
       <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
           <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
@@ -312,8 +316,13 @@
     const card = root.querySelector(".card");
     const retry = root.querySelector(".retry");
     retry.onclick = () => { retry.disabled = true; retryCurrentStage().catch((error) => guide.show("error", error.message)).finally(() => { retry.disabled = false; }); };
-    const journey = root.querySelector(".journey");
-    const journeyText = journey.querySelector("p");
+    const worker = root.querySelector(".worker");
+    const avatar = worker.querySelector(".worker-avatar");
+    avatar.append(card.querySelector(".robot").cloneNode(true));
+    const laptop = document.createElement("i"); laptop.className = "workstation"; avatar.append(laptop);
+    const workerTitle = worker.querySelector("strong");
+    const workerText = worker.querySelector("p");
+    const workingTitle = () => peoplePath.test(location.pathname) ? "Conferindo Pessoas" : servicePath.test(location.pathname) ? "Preenchendo Serviço" : valuesPath.test(location.pathname) ? "Preenchendo Valores" : "Abrindo revisão";
     const message = root.querySelector(".message");
     const title = root.querySelector("h2");
     const ring = root.querySelector(".target");
@@ -366,13 +375,10 @@
         retry.hidden = next !== "error" || !(servicePath.test(location.pathname) || valuesPath.test(location.pathname));
         shade.dataset.active = String(["people", "service", "values", "waiting"].includes(next));
         const index = peoplePath.test(location.pathname) ? 0 : servicePath.test(location.pathname) ? 1 : valuesPath.test(location.pathname) ? 2 : 3;
-        journey.hidden = next === "error" || next === "review-ready";
-        journeyText.textContent = text;
-        journey.querySelectorAll("li").forEach((item, i) => {
-          item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
-          item.querySelector("span").textContent = i < index ? "✓" : String(i + 1);
-          if (i === index) item.setAttribute("aria-current", "step"); else item.removeAttribute("aria-current");
-        });
+        worker.hidden = next === "error" || next === "review-ready";
+        worker.dataset.waiting = "false";
+        workerTitle.textContent = workingTitle();
+        workerText.textContent = text;
         if (next !== "review-ready" && next !== "error") {
           card.hidden = true;
           if (!["people", "service", "values", "waiting"].includes(next)) clearTarget();
@@ -404,8 +410,8 @@
         });
         if (next === "error" || next === "review-ready" || next === "review") clearTarget();
       },
-      wait(label) { if (host.isConnected && phase !== "error") journeyText.textContent = "Aguardando o portal · " + label; },
-      restore() { journeyText.textContent = baseText; },
+      wait(label) { if (host.isConnected && phase !== "error") { worker.dataset.waiting = "true"; workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
+      restore() { worker.dataset.waiting = "false"; workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
       confirm(element) {
         this.point(element);
         if (ring.style.display === "block" && !reduced()) {
