@@ -361,9 +361,9 @@
         .worker{width:min(300px,calc(100vw - 36px));gap:8px;padding:10px 12px}
         .worker-avatar{flex-basis:92px;height:96px}
         .worker .robot{margin-top:14px;animation:spell-bounce 1.8s ease-in-out infinite}
-        .worker .antenna{display:none}
-        .worker .robot:before{content:"";position:absolute;z-index:3;left:15px;top:-13px;width:38px;height:29px;background:radial-gradient(circle at 59% 61%,#dcffb5 0 2px,transparent 2.5px),linear-gradient(120deg,#b5efce,#32875c);clip-path:polygon(12% 100%,44% 0,66% 16%,100% 100%);transform:rotate(9deg)}
-        .worker .robot:after{content:"";position:absolute;z-index:4;left:9px;top:10px;width:49px;height:7px;border:1px solid #377d59;border-radius:50%;background:#8edfb0;transform:rotate(9deg);box-shadow:0 2px 2px #1e73432a}
+        :is(.worker,.card[data-mood=review]) .antenna{display:none}
+        :is(.worker,.card[data-mood=review]) .robot:before{content:"";position:absolute;z-index:3;left:15px;top:-13px;width:38px;height:29px;background:radial-gradient(circle at 59% 61%,#dcffb5 0 2px,transparent 2.5px),linear-gradient(120deg,#b5efce,#32875c);clip-path:polygon(12% 100%,44% 0,66% 16%,100% 100%);transform:rotate(9deg)}
+        :is(.worker,.card[data-mood=review]) .robot:after{content:"";position:absolute;z-index:4;left:9px;top:10px;width:49px;height:7px;border:1px solid #377d59;border-radius:50%;background:#8edfb0;transform:rotate(9deg);box-shadow:0 2px 2px #1e73432a}
         .worker .hand:before{height:36px;width:5px;box-shadow:0 0 8px #53d99680;transform:rotate(8deg)}
         .worker .hand:after{left:0;top:-34px}
         .worker-avatar:after{left:63px;top:21px;font-size:19px}
@@ -371,13 +371,14 @@
         .reaction-bubble{position:absolute;right:0;bottom:2px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;border:1px solid #a7dfbc;background:#f4fff7;color:#197a4b;box-shadow:0 2px 6px #26754c18;font:700 17px/1 system-ui}
         .reaction-bubble:after{content:"✦"}
         .worker[data-reaction=waiting] .reaction-bubble:after{content:"◷"}
-        .worker[data-reaction=waiting] .hand{animation:none;transform:rotate(20deg)}
-        .worker[data-reaction=waiting] .robot{animation:patient-bob 3s ease-in-out infinite}
-        .worker[data-reaction=waiting] .eye{animation:curious-eyes 2.4s ease-in-out infinite}
+        .worker[data-reaction=waiting] .hand{animation-duration:3s}
+        .worker .eye{animation:none;transition:transform .22s ease,border-radius .22s ease}
+        .worker .face:before,.worker .smile{transition:opacity .22s ease,transform .22s ease,width .22s ease}
+        .worker[data-reaction=waiting] .eye{transform:translateX(2px)}
         .worker[data-reaction=waiting] .face:before{transform:rotate(9deg);opacity:.65}
         .worker[data-reaction=confirmed] .reaction-bubble:after{content:"✓"}
-        .worker[data-reaction=confirmed] .robot{animation:happy-hop .6s ease-out both}
-        .worker[data-reaction=confirmed] .eye{height:5px;border-top:3px solid #baffd5;border-radius:8px 8px 0 0;background:transparent;animation:none}
+        .worker[data-reaction=confirmed] .worker-avatar{animation:happy-hop .6s ease-out both}
+        .worker[data-reaction=confirmed] .eye{transform:scaleY(.65);border-radius:8px 8px 4px 4px}
         .worker[data-reaction=confirmed] .face:before{opacity:0}
         .worker[data-reaction=confirmed] .arm-left{animation:none;transform:rotate(110deg)}
         .worker[data-reaction=confirmed] .smile{width:12px;height:6px;left:21px}
@@ -385,6 +386,18 @@
         .target[data-confirmed=true]{border-color:#16a363;background:#aaf0c414;box-shadow:0 0 0 4px #3bc28426,0 0 18px #32c77b30}
         .target[data-confirmed=true] .field-confirmed{display:grid;animation:check-pop .28s ease-out both}
         .card[data-mood=error] .smile{border-bottom:0;border-top:2px solid #3a7d58}
+        .farewell{display:none}
+        .card[data-mood=review] .farewell{display:block;margin:7px 0 0;color:#458164;font-size:11px;font-weight:500}
+        .card[data-mood=review] .robot{margin-top:9px;animation:final-bow 1.4s ease-in-out 2}
+        .card[data-mood=review] .eye{height:10px;border:0;border-radius:5px;background:#a9ffd3;animation:none}
+        .card[data-mood=review] .eye:first-child{transform:scaleY(.25) rotate(-8deg)}
+        .card[data-mood=review] .face:after{content:"";position:absolute;left:4px;right:4px;bottom:3px;height:5px;background:radial-gradient(ellipse at 10% 50%,#70dcae90 0 3px,transparent 4px),radial-gradient(ellipse at 90% 50%,#70dcae90 0 3px,transparent 4px)}
+        .card[data-mood=review] .smile{width:13px;height:6px;left:20px}
+        .card[data-mood=review] .hand{animation:final-wand 1.4s ease-in-out 2;transform:rotate(45deg)}
+        .card[data-mood=review] .hand:before{content:"";position:absolute;left:2px;bottom:7px;width:5px;height:29px;border-radius:3px;background:linear-gradient(#faffee 0 25%,#32875c 25% 80%,#b9f4cc 80%);box-shadow:0 0 7px #53d99660}
+        .card[data-mood=review] .hand:after{content:"✦";position:absolute;left:-5px;top:-25px;color:#1ca562;font-size:18px;text-shadow:0 0 9px #9aefb8}
+        @keyframes final-bow{0%,100%{transform:rotate(0)}30%{transform:translateY(-3px) rotate(-7deg)}65%{transform:rotate(5deg)}}
+        @keyframes final-wand{0%,100%{transform:rotate(45deg)}35%{transform:rotate(70deg)}65%{transform:rotate(30deg)}}
         @keyframes spell-bounce{0%,100%{transform:translateY(0) rotate(-4deg)}45%{transform:translateY(-4px) rotate(4deg)}70%{transform:translateY(-2px) rotate(-1deg)}}
         @keyframes patient-bob{50%{transform:translateY(-2px) rotate(3deg)}}
         @keyframes curious-eyes{0%,100%{transform:translateX(-2px)}50%{transform:translateX(2px)}}
@@ -400,7 +413,7 @@
       <section class="card" hidden aria-label="Assistente de preenchimento NFS-e">
         <div class="top">
           <div class="robot" aria-hidden="true"><i class="antenna"></i><div class="body"><div class="face"><i class="eye"></i><i class="eye"></i></div><i class="smile"></i><i class="badge"></i></div><i class="arm-left"></i><i class="hand"></i><i class="foot left"></i><i class="foot right"></i></div>
-          <div><div class="brand">NFS-e AUTOMÁTICO</div><h2>Vamos preparar sua nota</h2></div>
+          <div><div class="brand">NFS-e AUTOMÁTICO</div><h2>Vamos preparar sua nota</h2><p class="farewell">Minha parte da mágica está feita. ✨</p></div>
           <div class="controls"><button type="button" class="min" aria-label="Recolher painel" aria-expanded="true">−</button><button type="button" class="close" aria-label="Fechar painel de progresso">×</button></div>
         </div>
         <p class="message" role="status" aria-live="polite"></p>
@@ -435,14 +448,29 @@
     }
     const click = root.querySelector(".click");
     let dismissed = false, phase = "people", baseText = "", target, lastAction = 0, lastStage = null, dismissTimer, reactionTimer, presenting = false, observedBody;
+    let celebrationUntil = 0, lastCelebration = -Infinity, pendingReaction = "casting";
     function react(next) {
-      clearTimeout(reactionTimer);
-      worker.dataset.reaction = next;
       if (next !== "confirmed") ring.dataset.confirmed = "false";
-      if (next === "confirmed") reactionTimer = setTimeout(() => {
-        worker.dataset.reaction = worker.dataset.waiting === "true" ? "waiting" : "casting";
+      if (["error", "review"].includes(next)) {
+        clearTimeout(reactionTimer); celebrationUntil = 0;
+        worker.dataset.reaction = next; return;
+      }
+      if (next !== "confirmed") {
+        pendingReaction = next;
+        // As mensagens podem mudar várias vezes no mesmo instante. Preserve
+        // a reação curta em vez de reiniciar o corpo e o rosto a cada campo.
+        if (Date.now() < celebrationUntil) return;
+        worker.dataset.reaction = next; return;
+      }
+      if (Date.now() - lastCelebration >= 1600) {
+        lastCelebration = Date.now(); celebrationUntil = Date.now() + 750;
+        worker.dataset.reaction = "confirmed";
+      }
+      clearTimeout(reactionTimer);
+      reactionTimer = setTimeout(() => {
+        if (Date.now() >= celebrationUntil) worker.dataset.reaction = pendingReaction;
         ring.dataset.confirmed = "false";
-      }, 900);
+      }, Math.max(900, celebrationUntil - Date.now()));
     }
     const reduced = () => window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
     const mountObserver = window.MutationObserver ? new window.MutationObserver(() => {
