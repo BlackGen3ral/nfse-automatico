@@ -1,5 +1,6 @@
 {
-  "pc": "1.0.0",
+  "pc": "1.0.1",
   "android": "1.0.0",
-  "androidCode": 1
+  "androidCode": 1,
+  "windowsAvailable": false
 }

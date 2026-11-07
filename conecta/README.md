@@ -4,18 +4,22 @@ Primeira versão do controle Android → Windows → extensão NFS-e Automático
 
 Site e API públicos em https://nfse-conecta.arthurgabrielfera.workers.dev. Cada computador possui uma chave própria. O celular recebe uma credencial independente ao consumir um código temporário de pareamento de 12 caracteres.
 
+## Distribuição Windows suspensa
+
+O Microsoft Defender detectou o executável 1.0.0 e a compilação revisada 1.0.1 como Trojan:Win32/Wacatac.B!ml. O download está suspenso enquanto a detecção precisa de análise. A publicação só pode voltar após validação do arquivo específico e registro do seu SHA-256 em versions.json. O script de publicação reaproveita esse arquivo validado sem recompilar o Windows.
+
 ## Instalação
 
-1. No Windows, execute o programa e mantenha-o aberto. Ele se instala na pasta local do usuário e continua na área perto do relógio quando a janela é fechada. O início com o Windows é opcional, pela caixa da interface.
+1. No Windows, execute o programa e mantenha-o aberto. Quando uma versão estiver liberada, o executável roda da pasta onde foi salvo e continua na área perto do relógio quando a janela é fechada. O início com o Windows é opcional, pela caixa da interface.
 2. Instale a extensão 0.5.0 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
 3. No Android, instale o APK e digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. Gerar outro código revoga o celular anterior.
 4. Informe CNPJ, descrição e valor no Android. O computador precisa estar ligado e conectado. Certificado, PIN, login e CAPTCHA são tratados no computador. O usuário confere e confirma a emissão no portal.
 
 ## Atualizações
 
-A interface do Android é carregada do site com revalidação dos arquivos. O APK consulta updates.json ao abrir e oferece o download de uma nova versão, com confirmação da instalação pelo Android. O programa Windows consulta versões a cada hora e só aplica atualizações quando não há solicitação em execução. Ele verifica o SHA-256 antes de substituir o executável, mantém backup e reinicia em segundo plano. A extensão mantém o atualizador GitHub existente.
+A interface do Android é carregada do site com revalidação dos arquivos. O APK consulta updates.json ao abrir e oferece o download de uma nova versão, com confirmação da instalação pelo Android. O programa Windows consulta versões a cada hora e oferece a página de downloads quando encontra uma atualização. O usuário instala a nova versão. A extensão mantém o atualizador GitHub existente.
 
-Para publicar uma melhoria, altere versions.json e as partes correspondentes, execute release.ps1 e npm run deploy. Atualize também o versionCode para cada APK novo. A assinatura do Android deve permanecer a mesma. A chave e sua senha protegida pelo Windows ficam em %LOCALAPPDATA%/NFSeConectaBuild e devem ter backup privado. Nunca publique essa pasta. O código não contém tokens de clientes nem certificados de empresas.
+Para publicar uma melhoria, altere versions.json e as partes correspondentes, execute release.ps1 e npm run deploy. O Windows é compilado separadamente com build-pc.ps1 e só entra no pacote se windowsAvailable estiver habilitado e windowsApprovedSha256 corresponder ao executável. Atualize também o versionCode para cada APK novo. A assinatura do Android deve permanecer a mesma. A chave e sua senha protegida pelo Windows ficam em %LOCALAPPDATA%/NFSeConectaBuild e devem ter backup privado. Nunca publique essa pasta. O código não contém tokens de clientes nem certificados de empresas.
 
 ## Desenvolvimento
 

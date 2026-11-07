@@ -42,7 +42,11 @@ try {
     "review",
   );
   const updates = await (await fetch(origin + "/updates.json")).json();
-  for (const item of [updates.pc, updates.android, updates.extension]) {
+  if (updates.pc.available === false) {
+    const response = await fetch(origin + "/downloads/NFSe-Conecta-PC.exe", { method: "HEAD" });
+    assert.equal(response.status, 404);
+  }
+  for (const item of [updates.pc, updates.android, updates.extension].filter(item => item.available !== false)) {
     const response = await fetch(item.url);
     assert(response.ok);
     const bytes = Buffer.from(await response.arrayBuffer());
@@ -52,7 +56,7 @@ try {
     );
   }
   console.log(
-    "Conexão real validada: pareamento, fila única, confirmação de resultado e integridade dos três downloads.",
+    "Conexão real validada: pareamento, fila única, confirmação de resultado e integridade dos downloads disponíveis e suspensão do Windows.",
   );
 } finally {
   const batch = [

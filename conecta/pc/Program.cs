@@ -18,21 +18,15 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.0.0";
+ public const string CurrentVersion="1.0.1";
  public const string Site="https://nfse-conecta.arthurgabrielfera.workers.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
- public static readonly string Installed=Path.Combine(Folder,"NFSe-Conecta-PC.exe");
  [STAThread] static void Main(string[] args) {
   Application.EnableVisualStyles(); Application.SetCompatibleTextRenderingDefault(false); ServicePointManager.SecurityProtocol=SecurityProtocolType.Tls12;
   bool created; using(var mutex=new Mutex(false,"Local\\NFSeConecta-"+Environment.UserName,out created)) {
    bool acquired; try { acquired=mutex.WaitOne(0); } catch(AbandonedMutexException) { acquired=true; }
    if(!acquired){MessageBox.Show("O NFS-e Conecta já está aberto. Procure o ícone perto do relógio do Windows.","NFS-e Conecta");return;}
    Directory.CreateDirectory(Folder);
-   if(!String.Equals(Application.ExecutablePath,Installed,StringComparison.OrdinalIgnoreCase)) {
-    try { File.Copy(Application.ExecutablePath,Installed,true); mutex.ReleaseMutex(); Process.Start(new ProcessStartInfo(Installed,Array.IndexOf(args,"--background")>=0?"--background":""){UseShellExecute=true}); }
-    catch(Exception){MessageBox.Show("Não foi possível instalar nesta conta do Windows. Feche a versão anterior e tente novamente.","NFS-e Conecta");}
-    return;
-   }
    Application.Run(new ConectaForm(Array.IndexOf(args,"--background")>=0));
   }
  }
@@ -45,7 +39,7 @@ internal sealed class ConectaForm:Form {
  Dictionary<string,object> job;
  bool delivered;
  volatile bool exit,updating;
- string lastId="",pendingState="",pendingText="";
+ string lastId="",pendingState="",pendingText="",announcedVersion="";
  DateTime jobStarted;
  NotifyIcon tray;
  Label status,code;
@@ -70,7 +64,7 @@ internal sealed class ConectaForm:Form {
   updates=Button("Verificar atualizações",375);updates.Click+=async delegate{await CheckUpdates(true);};
   startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,433)};Controls.Add(startup);
   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){startup.Checked=key!=null&&key.GetValue("NFSeConecta")!=null;}
-  startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Program.Installed+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
+  startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
   Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Ao fechar, continua perto do relógio.",AutoSize=true,Location=new Point(31,470),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
   tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=true};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
   FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit){e.Cancel=true;Hide();}};
@@ -186,13 +180,42 @@ internal sealed class ConectaForm:Form {
   Respond(stream,200,result);
  }catch{} }}
  void Respond(NetworkStream stream,int statusCode,object result){var bytes=Encoding.UTF8.GetBytes(Json(result));var h=Encoding.ASCII.GetBytes("HTTP/1.1 "+statusCode+" OK\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: "+bytes.Length+"\r\nConnection: close\r\n\r\n");stream.Write(h,0,h.Length);stream.Write(bytes,0,bytes.Length);}
- async Task CheckUpdates(bool manual){
+ async Task CheckUpdates(bool manual) {
   await executionGate.WaitAsync();
   try {
-   lock(gate){if(job!=null){if(manual)SetStatus("A atualização será verificada ao terminar a solicitação atual.");return;}updating=true;}var manifest=Parse(await http.GetStringAsync(Program.Site+"/updates.json"));var pc=(Dictionary<string,object>)manifest["pc"];if(new Version(Str(pc,"version"))<=new Version(Program.CurrentVersion)){if(manual)SetStatus("Você está usando a versão mais recente.");return;}var uri=new Uri(Str(pc,"url"));if(uri.Scheme!="https"||uri.Host!=new Uri(Program.Site).Host)throw new Exception();var bytes=await http.GetByteArrayAsync(uri);string digest;using(var sha=SHA256.Create())digest=BitConverter.ToString(sha.ComputeHash(bytes)).Replace("-","").ToLowerInvariant();if(digest!=Str(pc,"sha256"))throw new Exception();var next=Path.Combine(Program.Folder,"update.exe");File.WriteAllBytes(next,bytes);
-   string script="$ErrorActionPreference='Stop'; Wait-Process -Id "+Process.GetCurrentProcess().Id+" -ErrorAction SilentlyContinue; Copy-Item -LiteralPath '"+Program.Installed.Replace("'","''")+"' -Destination '"+(Program.Installed+".bak").Replace("'","''")+"' -Force; Copy-Item -LiteralPath '"+next.Replace("'","''")+"' -Destination '"+Program.Installed.Replace("'","''")+"' -Force; Start-Process -FilePath '"+Program.Installed.Replace("'","''")+"' -ArgumentList '--background' -WindowStyle Hidden";
-   Process.Start(new ProcessStartInfo("powershell.exe","-NoProfile -NonInteractive -WindowStyle Hidden -EncodedCommand "+Convert.ToBase64String(Encoding.Unicode.GetBytes(script))){UseShellExecute=false,CreateNoWindow=true,WindowStyle=ProcessWindowStyle.Hidden});exit=true;BeginInvoke(new Action(Application.Exit));
-  }catch{if(manual)SetStatus("Não foi possível verificar a atualização. Tente novamente mais tarde.");}finally{updating=false;executionGate.Release();}
+   lock(gate) {
+    if(job!=null) {
+     if(manual) SetStatus("Conclua a solicitação atual antes de verificar atualizações.");
+     return;
+    }
+    updating=true;
+   }
+   var manifest=Parse(await http.GetStringAsync(Program.Site+"/updates.json"));
+   var pc=(Dictionary<string,object>)manifest["pc"];
+   if(pc.ContainsKey("available") && !Convert.ToBoolean(pc["available"])) {
+    if(manual) SetStatus("A versão Windows está em revisão.");
+    return;
+   }
+   var latest=Str(pc,"version");
+   if(new Version(latest)<=new Version(Program.CurrentVersion)) {
+    if(manual) SetStatus("Você está usando a versão mais recente.");
+    return;
+   }
+   SetStatus("Versão "+latest+" disponível na central de downloads.");
+   if(manual) {
+    if(MessageBox.Show(this,"A versão "+latest+" está disponível. Abrir a central de downloads?","Atualização disponível",MessageBoxButtons.YesNo,MessageBoxIcon.Information)==DialogResult.Yes) {
+     Process.Start(new ProcessStartInfo(Program.Site+"/#downloads") {UseShellExecute=true});
+    }
+   } else if(announcedVersion!=latest && IsHandleCreated && !IsDisposed) {
+    announcedVersion=latest;
+    BeginInvoke(new Action(() => tray.ShowBalloonTip(5000,"NFS-e Conecta","Nova versão disponível. Abra o programa e clique em Verificar atualizações.",ToolTipIcon.Info)));
+   }
+  } catch {
+   if(manual) SetStatus("Não foi possível verificar a atualização. Tente novamente mais tarde.");
+  } finally {
+   updating=false;
+   executionGate.Release();
+  }
  }
  protected override void OnFormClosed(FormClosedEventArgs e){exit=true;if(listener!=null)listener.Stop();tray.Visible=false;tray.Dispose();http.Dispose();base.OnFormClosed(e);}
 }

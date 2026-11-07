@@ -14,8 +14,14 @@ const artifact = (file, version) => ({
     .update(fs.readFileSync("downloads/" + file))
     .digest("hex"),
 });
+const pc = versions.windowsAvailable === true
+  ? {...artifact("NFSe-Conecta-PC.exe", versions.pc), available: true}
+  : {version: versions.pc, available: false};
+if (pc.available && pc.sha256 !== versions.windowsApprovedSha256) {
+  throw new Error("O executável do Windows não corresponde ao arquivo aprovado para distribuição.");
+}
 const manifest = {
-  pc: artifact("NFSe-Conecta-PC.exe", versions.pc),
+  pc,
   android: {
     ...artifact("NFSe-Conecta.apk", versions.android),
     versionCode: versions.androidCode,

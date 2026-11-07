@@ -1,6 +1,5 @@
 $ErrorActionPreference='Stop'
 $extensionRoot=if(Test-Path '../manifest.json'){'..'}else{'../nfse-git'}
-& ./build-pc.ps1
 & ./build-android.ps1
 $package=Join-Path (Get-Location) 'work/extension-package/NFSe-Automatico'
 New-Item -ItemType Directory -Force -Path $package | Out-Null

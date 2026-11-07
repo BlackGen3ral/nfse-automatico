@@ -1,8 +1,7 @@
 {
   "pc": {
-    "version": "1.0.0",
-    "url": "https://nfse-conecta.arthurgabrielfera.workers.dev/downloads/NFSe-Conecta-PC.exe",
-    "sha256": "2a0fa264203ccfbfac9912806a8a3cd9b72772914470bb0257ed367109f99e6b"
+    "version": "1.0.1",
+    "available": false
   },
   "android": {
     "version": "1.0.0",
