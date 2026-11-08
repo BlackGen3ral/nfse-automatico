@@ -29,6 +29,7 @@ export async function diagnostics(request,env,{body,hash,token,json,limited,ApiE
  }
  await session();
  if(path==='/api/diagnostics/list'&&request.method==='GET'){
+  await db.prepare('DELETE FROM diagnostics WHERE last_seen<?').bind(Date.now()-90*86400000).run();
   const result=await db.prepare('SELECT * FROM diagnostics ORDER BY last_seen DESC LIMIT 100').all();return json({reports:result.results});
  }
  if(request.method==='POST')sameOrigin();
