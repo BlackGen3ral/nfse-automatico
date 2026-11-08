@@ -78,3 +78,11 @@ O NFS-e Conecta conecta o Android a um PC Windows pela internet. Instale o progr
 O programa do PC recebe comandos autenticados pela sua própria conexão HTTPS. A extensão se comunica apenas com o serviço local em 127.0.0.1:17846, usando uma chave de pareamento local. O conteúdo dos comandos não é gravado no GitHub. A confirmação de sucesso no celular depende da chegada ao rascunho correto da revisão. A emissão é confirmada pelo usuário no portal.
 
 Central de acesso e downloads: https://nfse-conecta.arthurgabrielfera.workers.dev
+
+## Painel privado de diagnósticos
+
+A área https://nfse-conecta.pages.dev/diagnosticos usa chave privada e sessão HttpOnly. O acesso inicial fica em um arquivo local entregue ao proprietário; nenhuma chave vai ao GitHub. Após atualizar a extensão, abra esse arquivo para entrar e conectar o navegador (ou use Conectar esta extensão). Repita a conexão em outros navegadores.
+
+Após uma etapa concluída, a extensão aprende a estrutura do formulário. Nas próximas execuções, alterações nessa referência e falhas de etapa podem gerar alertas de possível mudança. Campos condicionais também podem gerar suspeitas e exigem análise humana. O relatório inclui somente etapa, versão, identificadores conhecidos ausentes, contagens de campos e uma impressão SHA-256 da estrutura. Não envia valores, CNPJs, descrição, endereço, dados de certificado, HTML ou capturas de tela. Campos novos desconhecidos são relatados por contagem, sem copiar o texto.
+
+Os alertas são agrupados, enfileirados localmente quando offline e enviados em segundo plano a cada minuto quando há conexão com o painel. A fila tem limite de 100 relatórios; o histórico do painel expira após 90 dias. O painel permite marcar Novo, Em análise e Corrigido. Não realiza correções nem emissões automaticamente.

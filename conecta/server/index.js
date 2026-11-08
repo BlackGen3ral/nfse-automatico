@@ -1,4 +1,5 @@
 import { assets } from "./assets.js";
+import {diagnostics} from './diagnostics.js';
 const headers = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -328,10 +329,11 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
     try {
+      if (url.pathname.startsWith('/api/diagnostics/')) return await diagnostics(request,env,{body,hash,token,json,limited,ApiError});
       if (url.pathname.startsWith("/api/")) return await api(request, env);
       if (!["GET", "HEAD"].includes(request.method))
         return json({ error: "Método inválido." }, 405);
-      const asset = assets[url.pathname === "/" ? "/index.html" : url.pathname];
+      const asset = assets[url.pathname === "/" ? "/index.html" : url.pathname === '/diagnosticos' ? '/diagnostics.html' : url.pathname];
       if (!asset)
         return new Response("Página não encontrada.", { status: 404 });
       const data = asset.base64
