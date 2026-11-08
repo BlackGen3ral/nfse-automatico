@@ -27,11 +27,14 @@ export async function diagnostics(request,env,{body,hash,token,json,limited,ApiE
   await db.prepare("INSERT INTO diagnostics(id,payload,created,last_seen,count,status) VALUES(?,?,?,?,1,'new') ON CONFLICT(id) DO UPDATE SET last_seen=excluded.last_seen,count=count+1").bind(id,JSON.stringify(d),Date.now(),Date.now()).run();
   await db.prepare('DELETE FROM diagnostics WHERE last_seen<?').bind(Date.now()-90*86400000).run();return json({ok:true});
  }
- await session();
  if(path==='/api/diagnostics/list'&&request.method==='GET'){
   await db.prepare('DELETE FROM diagnostics WHERE last_seen<?').bind(Date.now()-90*86400000).run();
   const result=await db.prepare('SELECT * FROM diagnostics ORDER BY last_seen DESC LIMIT 100').all();return json({reports:result.results});
  }
+ if(path==='/api/diagnostics/access'&&request.method==='GET'){
+  try{await session();return json({admin:true});}catch{return json({admin:false});}
+ }
+ await session();
  if(request.method==='POST')sameOrigin();
  if(path==='/api/diagnostics/connect'&&request.method==='POST'){
   const key=token(),id=crypto.randomUUID();await db.prepare('INSERT INTO diagnostic_keys(kind,hash) VALUES(?,?)').bind('reporter:'+id,await hash(key)).run();return json({token:key});
