@@ -29,7 +29,7 @@ test("Conferência relê o campo e bloqueia avanço quando o portal perde uma se
   await e.conferStage();await e.update("done","Conferido");
   const audit=e.messages.findLast(message=>message.type==="nfse:update").state.audit;
   assert.equal(audit[0].count,1);assert.equal(audit[0].fields[0],"Item NBS");
-  assert.equal(JSON.stringify(audit).includes("120012000"),false);
+  assert.equal(audit[0].checks[0].expected,"120012000");
 });
 test("Histórico incompleto não declara sucesso e diagnóstico detecta falta de internet",()=>{
   const e=engine();

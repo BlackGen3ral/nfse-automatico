@@ -22,9 +22,13 @@ A extensão lê as exceções da etapa Pessoas quando o CNPJ do emitente corresp
 
 ## Conferência e diagnóstico
 
-A extensão relê os campos que alterou antes de avançar. Se uma seleção, resposta ou valor tiver sido perdido pelo portal, ela interrompe a etapa e indica a pendência. O painel lateral mantém a lista de campos conferidos por etapa, sem registrar seus valores no histórico. O autodiagnóstico diferencia falta de internet, sessão expirada, verificação manual, avisos de validação e indisponibilidade do portal. As conferências verificam o preenchimento, não validam o enquadramento fiscal ou os cálculos do portal. A emissão continua manual.
+A extensão relê os campos que alterou antes de avançar. Se uma seleção, resposta ou valor tiver sido perdido pelo portal, ela interrompe a etapa e indica a pendência. O painel lateral mantém a lista de campos conferidos por etapa, com os valores esperados guardados somente na sessão local para comparar a tela final. O autodiagnóstico diferencia falta de internet, sessão expirada, verificação manual, avisos de validação e indisponibilidade do portal. As conferências verificam o preenchimento, não validam o enquadramento fiscal ou os cálculos do portal. A emissão continua manual.
 
 O botão ↗ ao lado da versão expande a própria extensão em uma nova guia, com o formulário maior. O painel expandido fica vinculado à guia do portal de origem e usa o mesmo rascunho, mesmo quando outra aba estiver ativa. Ao iniciar o preenchimento, o navegador volta ao portal para acompanhar o robô; a guia expandida permanece disponível. O botão ↗ nessa guia volta ao portal. A expansão não abre uma nova página da NFS-e.
+
+Na revisão, o robô compara os campos visíveis que consegue identificar com os valores esperados e mostra confirmados, diferentes e não localizados. Campos não localizados ou ambíguos exigem conferência manual; não são tratados como sucesso. Abra **Ver resumo da revisão** no cartão para ver esperado e encontrado; a contagem de fechamento pausa enquanto o resumo estiver aberto. O resultado também fica no painel lateral. Essa comparação não valida o enquadramento fiscal nem os cálculos do portal.
+
+As esperas reagem a mudanças do formulário, com agrupamento de eventos em 16 ms e checagem periódica de segurança para campos sem notificação. Os limites de tempo, o cancelamento e a conferência antes de avançar permanecem ativos. Isso reduz a latência da extensão, não o tempo de resposta do portal.
 
 ## Instalação
 

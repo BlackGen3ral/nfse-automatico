@@ -16,7 +16,7 @@
     // O portal reutiliza o mesmo ID em opções de um grupo. O ID sozinho pode
     // devolver a primeira opção (desmarcada) em vez daquela que foi escolhida.
     const radio = field.type === "radio" ? {name:field.name, id:field.id, value:field.value, form:field.form} : null;
-    confirmations.set(key, { label, check: () => {
+    confirmations.set(key, { label, review: {id:field.id || "",name:field.name || "",type:field.type || "",expected:radio ? String(field.value) : String(expected),display:field.selectedOptions?.[0]?.textContent?.trim() || String(expected)}, check: () => {
       if (radio) return Array.from(document.querySelectorAll('input[type=radio]')).some(current =>
         (radio.name ? current.name === radio.name : current.id === radio.id) && current.value === radio.value &&
         (!radio.form || current.form === radio.form || (radio.form.id && current.form?.id === radio.form.id)) && current.checked);
@@ -32,7 +32,7 @@
     const failed = checks.filter(item => !item.check());
     if (failed.length) throw new Error("O portal alterou ou não manteve: " + failed.map(item => item.label).join(" · "));
     audit = audit.filter(item => item.stage !== stageName());
-    audit.push({stage: stageName(), count: checks.length, fields: checks.map(item => item.label.slice(0, 120)), confirmedAt: Date.now()});
+    audit.push({stage: stageName(), count: checks.length, fields: checks.map(item => item.label.slice(0, 120)), checks:checks.filter(item=>item.review).map(item=>({...item.review,label:item.label})), confirmedAt: Date.now()});
     guide.wait("Conferência concluída · " + checks.length + " campos mantidos pelo portal");
   }
   function reviewExplanation(records) {
@@ -41,6 +41,54 @@
       return "Você chegou à revisão, mas o histórico de conferência está incompleto. Confira todos os dados no portal antes de emitir.";
     return confirmed.map(item => item.stage + ": " + item.count + " campos conferidos").join(" · ") +
       ". As seleções foram relidas antes de cada avanço. Confira o resumo e os cálculos do portal; a emissão continua com você.";
+  }
+  function compareReviewValue(actual, check) {
+    const clean = value => String(value ?? "").replace(/\s+/g," ").trim();
+    if (check.id==="ServicoPrestado_Descricao") return clean(actual)===clean(check.expected);
+    if (/Inscricao|CNPJ/.test(check.id + check.label)) return DIGITS(actual).length===14 && DIGITS(actual)===DIGITS(check.expected);
+    if (/ValorServico|AliquotaSN/.test(check.id)) {
+      const number = value => Number(String(value).replace(/R\$|%|\s/g,"").replace(/\./g,"").replace(",","."));
+      return clean(actual)!=="" && Number.isFinite(number(actual)) && number(actual)===number(check.expected);
+    }
+    if (/Codigo(?:Tributacao|NBS|IndOp|Situacao|Classificacao)/.test(check.id)) {
+      const code = value => String(value).match(/^\s*[\d.]+/)?.[0].replace(/\D/g,"");
+      if (code(check.display) && code(actual)===code(check.display)) return true;
+    }
+    return clean(actual)===clean(check.expected) || norm(actual)===norm(check.display);
+  }
+  function inspectReview(records) {
+    const read = element => {
+      if (!visible(element)) return null;
+      if (element.matches?.("input,select,textarea")) {
+        if (element.type === "radio") return element.checked ? element.value : null;
+        return element.value;
+      }
+      return (element.innerText || element.textContent || "").trim();
+    };
+    const labels = Array.from(document.querySelectorAll("label,dt,th"));
+    const items = (records || []).flatMap(record => (record.checks || []).map(check => {
+      let actual = check.type === "radio" && check.name
+        ? read(Array.from(document.querySelectorAll('input[type=radio]')).find(field=>field.name===check.name && field.checked))
+        : check.id ? read(document.getElementById(check.id)) : null;
+      if (actual === null) {
+        const wanted = norm(check.label.split(":")[0]);
+        const matches = labels.filter(label=>norm(label.textContent)===wanted);
+        const values = matches.map(label => {
+          const control = label.htmlFor && document.getElementById(label.htmlFor);
+          return control ? read(control) : read(label.nextElementSibling);
+        }).filter(value=>value!==null && value!=="");
+        const unique = [...new Set(values)];
+        if (unique.length===1) actual=unique[0];
+      }
+      return {...check,stage:record.stage,actual,status:actual===null?"missing":compareReviewValue(actual,check)?"confirmed":"changed"};
+    }));
+    const confirmed=items.filter(item=>item.status==="confirmed").length;
+    const changed=items.filter(item=>item.status==="changed").length;
+    const missing=items.filter(item=>item.status==="missing").length;
+    const summary = !items.length ? "Não há histórico suficiente para comparar esta revisão. Confira todos os dados no portal." :
+      "Revisão: " + confirmed + " confirmados, " + changed + " diferentes e " + missing + " não localizados na tela. " +
+      (changed ? "Confira as diferenças antes de emitir." : missing ? "Os itens não localizados precisam de conferência manual." : "Os campos comparados estão iguais ao preenchimento solicitado. Confira os cálculos e emita manualmente.");
+    return {items,confirmed,changed,missing,summary,checkedAt:Date.now()};
   }
   let stopped = false, activeRemoteJobId = null;
   function ensureRunning() {
@@ -334,6 +382,12 @@
         @media(prefers-reduced-motion:reduce){*,*:before,*:after,.robot,.eye,li[data-state=active] span{animation:none!important;transition:none!important}}
         .retry[hidden]{display:none!important}.retry{display:block;margin:0 16px 12px;padding:9px 12px;border-color:#94dfb755;background:#12854d;color:#edfff4;cursor:pointer}
         .dismiss-countdown{margin:0;padding:0 18px 12px;text-align:right;font-size:11px;color:#54836a;font-variant-numeric:tabular-nums}
+        .review-details{margin:0 16px 14px;padding:10px 12px;border:1px solid #d2e9da;border-radius:10px;background:#fff;font-size:12px;pointer-events:auto}
+        .review-details summary{cursor:pointer;font-weight:650;color:#286948}
+        .review-details ul{max-height:38vh;overflow:auto;margin:10px 0 0;padding:0;list-style:none}
+        .review-details li{text-align:left;padding:9px 0;border-top:1px solid #e5eee8;color:#486854;font-size:11px;white-space:pre-line;overflow-wrap:anywhere}
+        .review-details li:before{display:none}.review-details li[data-result=changed]{color:#a05a29}
+        .card[data-review-complete=false] .farewell{display:none}
         .worker[hidden]{display:none!important}
         .worker{position:relative;display:flex;align-items:center;gap:10px;width:min(280px,calc(100vw - 36px));padding:10px 14px;border:1px solid #99dcb4;border-radius:18px;background:linear-gradient(135deg,#fff,#eafbf0);box-shadow:0 10px 30px #001a1638;color:#24533b;font:12px/1.4 "Segoe UI",system-ui,sans-serif;pointer-events:none}
         .worker-avatar{position:relative;flex:0 0 78px;height:80px}
@@ -417,6 +471,7 @@
           <div class="controls"><button type="button" class="min" aria-label="Recolher painel" aria-expanded="true">−</button><button type="button" class="close" aria-label="Fechar painel de progresso">×</button></div>
         </div>
         <p class="message" role="status" aria-live="polite"></p>
+        <details class="review-details" hidden><summary>Ver resumo da revisão</summary><ul></ul></details>
         <ol aria-label="Progresso"><li><span>1</span>Pessoas</li><li><span>2</span>Serviço</li><li><span>3</span>Valores</li><li><span>4</span>Revisão</li></ol>
         <button type="button" class="retry" hidden>Tentar novamente nesta etapa</button>
         <p class="dismiss-countdown" aria-live="off"></p>
@@ -432,6 +487,10 @@
     const workerText = worker.querySelector("p");
     const workingTitle = () => peoplePath.test(location.pathname) ? "Conferindo Pessoas" : servicePath.test(location.pathname) ? "Preenchendo Serviço" : valuesPath.test(location.pathname) ? "Preenchendo Valores" : "Abrindo revisão";
     const message = root.querySelector(".message");
+    const reviewDetails = root.querySelector(".review-details");
+    reviewDetails.addEventListener("toggle",()=>{
+      if (reviewDetails.open) { clearInterval(dismissTimer); root.querySelector(".dismiss-countdown").textContent="Resumo aberto · feche quando terminar de conferir"; }
+    });
     const title = root.querySelector("h2");
     const ring = root.querySelector(".target");
     const cursor = root.querySelector("svg[data-cursor]");
@@ -520,6 +579,7 @@
     window.addEventListener("pagehide", () => { presenting = false; clearTimeout(reactionTimer); mountObserver?.disconnect(); observedBody = null; });
     return {
       show(next, text) {
+        reviewDetails.hidden = true;
         clearInterval(dismissTimer);
         react(next === "error" ? "error" : next === "review-ready" ? "review" : "casting");
         presenting = true;
@@ -558,12 +618,25 @@
         lastStage = stage;
         card.dataset.mood = next === "error" ? "error" : next === "review-ready" ? "review" : "working";
         title.textContent = next === "error" ? "Ficou algo pendente" : next === "review-ready" ? "Agora é com você!" : ["Preenchendo Pessoas","Preenchendo Serviço","Preenchendo Valores","Abrindo revisão"][index];
-        card.querySelectorAll("li").forEach((item,i) => {
+        card.querySelectorAll("ol > li").forEach((item,i) => {
           item.dataset.state = i < index ? "done" : i === index ? "active" : "pending";
           item.querySelector("span").textContent = i < index ? "✓" : String(i+1);
           if (i === index) item.setAttribute("aria-current","step"); else item.removeAttribute("aria-current");
         });
         if (next === "error" || next === "review-ready" || next === "review") clearTarget();
+      },
+      reviewReport(report) {
+        this.show(report.changed ? "error" : "review-ready",report.summary);
+        card.dataset.reviewComplete=String(report.items.length>0 && !report.changed && !report.missing);
+        title.textContent = report.changed ? "Encontrei diferenças na revisão" : report.missing || !report.items.length ? "Falta conferir alguns itens" : "Tudo comparado! Agora é com você.";
+        reviewDetails.hidden = false;
+        const list=reviewDetails.querySelector("ul");list.replaceChildren();
+        for (const item of report.items) {
+          const row=document.createElement("li");row.dataset.result=item.status;
+          row.textContent=(item.status==="confirmed"?"✓ ":item.status==="changed"?"⚠ ":"○ ")+item.label+"\nEsperado: "+item.display+"\nRevisão: "+(item.actual===null?"Não localizado — confira manualmente":item.actual);
+          list.append(row);
+        }
+        if (reviewDetails.open) { clearInterval(dismissTimer); root.querySelector(".dismiss-countdown").textContent="Resumo aberto · feche quando terminar de conferir"; }
       },
       wait(label) { keepWorking(); if (host.isConnected && !["error", "review-ready"].includes(phase)) { worker.dataset.waiting = "true"; react("waiting"); workerTitle.textContent = label.startsWith("Recuperando") ? "Tentando novamente" : "Aguardando o portal"; workerText.textContent = label; } },
       restore() { if (["error", "review-ready"].includes(phase)) return; keepWorking(); worker.dataset.waiting = "false"; react("casting"); workerTitle.textContent = workingTitle(); workerText.textContent = baseText; },
@@ -708,6 +781,27 @@
     }
   }
 
+  function waitForPortalChange(interval) {
+    return new Promise(resolve => {
+      let observer, fastTimer, timer;
+      const finish = () => {
+        clearTimeout(timer); clearTimeout(fastTimer); observer?.disconnect();
+        document.removeEventListener?.("input", wake, true);
+        document.removeEventListener?.("change", wake, true);
+        resolve();
+      };
+      const wake = () => { if (fastTimer === undefined) fastTimer = setTimeout(finish,16); };
+      timer = setTimeout(finish,interval);
+      const Observer = window.MutationObserver;
+      if (Observer && document.body) {
+        observer = new Observer(wake);
+        // Observadores do documento não atravessam o Shadow DOM do robô.
+        observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","selected","checked","aria-selected","aria-disabled","aria-expanded"]});
+      }
+      document.addEventListener("input",wake,true);
+      document.addEventListener("change",wake,true);
+    });
+  }
   async function waitFor(label, predicate, timeout = 7500) {
     let deadline = Date.now() + timeout;
     const startedAt = Date.now();
@@ -723,7 +817,7 @@
       if (result) { if (waitingShown) guide.restore(); return result; }
       if (!waitingShown && Date.now() - startedAt > 1300) { guide.wait(label); waitingShown = true; }
       const interval = Date.now() - startedAt < 1500 ? 60 : 140;
-      await new Promise((resolve) => setTimeout(resolve, interval));
+      await waitForPortalChange(interval);
       if (Date.now() >= deadline && !extended) {
         const health = portalHealth();
         if (health && health.kind !== "transient") throw portalFailure(label);
@@ -745,7 +839,7 @@
     return waitFor(label, () => chooseRadio(scope(), option)).then(result => {
       const radio = findRadio(scope(), option);
       const confirmation = confirmations.get(radio?.name || radio?.id);
-      if (confirmation) confirmation.label = label + ": " + option;
+      if (confirmation) { confirmation.label = label + ": " + option; confirmation.review.display = option; }
       return result;
     });
   }
@@ -937,7 +1031,13 @@
     if (!first?.name || first.name !== second?.name ||
         !first.matches("input[type=radio]") || !second.matches("input[type=radio]")) return false;
     if (!findRadio(scope, "Não", first.name) || !findRadio(scope, "Sim", first.name)) return false;
-    return chooseRadio(scope, answer, first.name);
+    const chosen=chooseRadio(scope, answer, first.name);
+    const confirmation=confirmations.get(first.name);
+    if (chosen && confirmation) {
+      confirmation.label=(questionStart.startsWith("a exigibilidade")?"Suspensão do ISSQN":"Retenção do ISSQN")+": "+answer;
+      confirmation.review.display=answer;
+    }
+    return chosen;
   }
 
   async function fillValues(invoice = null) {
@@ -1039,7 +1139,9 @@
       const state = await chrome.runtime.sendMessage({type:"nfse:status"});
       if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
           state.visualDraft === draftId() && !document.querySelector("input[type=password]")) {
-        guide.show("review-ready", reviewExplanation(state.audit));
+        const reviewReport=inspectReview(state.audit);
+        guide.reviewReport(reviewReport);
+        await chrome.runtime.sendMessage({type:"nfse:update",state:{...state,text:reviewReport.summary,reviewReport,until:Date.now()+1800000}});
         chrome.runtime.sendMessage({type:"nfse:remote-result"}).catch(()=>{});
       }
       return;

@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "build": "node build.mjs && node build-worker.mjs",
-    "test": "node --test tests/api.test.mjs tests/extension.test.mjs tests/portal-login.test.mjs tests/scanner.test.mjs tests/cancel-engine.test.mjs tests/mobile-stop.test.mjs tests/audit-engine.test.mjs tests/guide-reactions.test.mjs tests/new-note-tab.test.mjs",
+    "test": "node --test tests/api.test.mjs tests/extension.test.mjs tests/portal-login.test.mjs tests/scanner.test.mjs tests/cancel-engine.test.mjs tests/mobile-stop.test.mjs tests/audit-engine.test.mjs tests/guide-reactions.test.mjs tests/new-note-tab.test.mjs tests/review-speed.test.mjs",
     "deploy": "cf deploy --prebuilt",
     "pretest": "node build.mjs"
   },

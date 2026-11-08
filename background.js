@@ -230,7 +230,7 @@ chrome.runtime.onMessage.addListener((message,sender,respond)=>{
     if (url.origin!=="https://www.nfse.gov.br" || !url.pathname.startsWith("/EmissorNacional/DPS/") || /\/DPS\/(?:Pessoas|Servi(?:c|ç|%c3%a7)o|Tributacao)(?:\/|$)/i.test(url.pathname)) return {ok:false};
     const draft=url.searchParams.get("idr");
     if (state?.phase !== "review" || !draft || state.visualDraft !== draft || state.until <= Date.now()) return {ok:false};
-    await remoteProgress(sender.tab.id,"review-ready","Deu tudo certo! A nota está pronta para conferir e emitir manualmente no PC.");
+    await remoteProgress(sender.tab.id,state.reviewReport?.changed?"error":"review-ready",state.reviewReport?.summary || "A nota chegou à revisão. Confira os dados e emita manualmente no PC.");
     return {ok:true};
   })();
   task.then(respond,()=>respond(message.type==="nfse:remote-control"?{active:true,unavailable:true}:{ok:false,error:"Abra o programa NFS-e Conecta no PC e tente conectar novamente."}));

@@ -420,6 +420,11 @@ async function refresh() {
     entry.textContent = record.stage + " · " + record.count + " campos confirmados antes de avançar. " + (record.fields || []).join(" · ");
     auditContent.append(entry);
   }
+  for (const item of current?.reviewReport?.items || []) {
+    const entry=document.createElement("p");
+    entry.textContent=(item.status==="confirmed"?"✓ Confirmado: ":item.status==="changed"?"⚠ Diferente: ":"○ Conferir manualmente: ")+item.label+". Esperado: "+item.display+". Revisão: "+(item.actual ?? "Não localizado nesta tela")+".";
+    auditContent.append(entry);
+  }
   const inService = serviceUrl.test(tab?.url || "");
   const inValues = valuesUrl.test(tab?.url || "");
   busy = !!current && (["people", "waiting", "service", "values"].includes(current.phase) ||
