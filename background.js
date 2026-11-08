@@ -67,16 +67,30 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error
 
 const remoteInFlight = new Set();
 const extraTabKey = (id) => "nfseExtraTab:" + id;
+async function editTab(action) {
+  for (let attempt=0;;attempt++) {
+    try { return await action(); }
+    catch (error) {
+      if (attempt>=2 || !/tabs cannot be edited|dragging a tab/i.test(error?.message || "")) throw error;
+      await new Promise(resolve=>setTimeout(resolve,120));
+    }
+  }
+}
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type !== "nfse:new-note-tab") return;
-  if (sender.url !== chrome.runtime.getURL("popup.html")) { respond({ok:false}); return; }
+  const ownPanel = sender.id === chrome.runtime.id && (sender.url
+    ? sender.url.split(/[?#]/)[0] === chrome.runtime.getURL("popup.html") : !sender.tab);
+  if (!ownPanel) { respond({ok:false,error:"Reabra o painel da extensão para abrir outra nota."}); return; }
+  let stage = "criar a nova guia";
   const task = (async () => {
     // Registra a intenção antes de carregar o portal, evitando uma corrida
     // entre a abertura da guia e o content script.
-    const tab = await chrome.tabs.create({url:"about:blank",active:true});
+    const tab = await editTab(()=>chrome.tabs.create({url:"about:blank",active:false}));
     try {
+      stage = "preparar a nova nota";
       await chrome.storage.session.set({[extraTabKey(tab.id)]:{until:Date.now()+9*60*1000,completed:false}});
-      await chrome.tabs.update(tab.id,{url:"https://www.nfse.gov.br/EmissorNacional/Dashboard"});
+      stage = "abrir o portal na nova guia";
+      await editTab(()=>chrome.tabs.update(tab.id,{url:"https://www.nfse.gov.br/EmissorNacional/Dashboard",active:true}));
       return {ok:true,tabId:tab.id};
     } catch (error) {
       await chrome.storage.session.remove(extraTabKey(tab.id)).catch(()=>{});
@@ -84,7 +98,7 @@ chrome.runtime.onMessage.addListener((message, sender, respond) => {
       throw error;
     }
   })();
-  task.then(respond,()=>respond({ok:false,error:"Não consegui abrir outra nota. Tente novamente."}));
+  task.then(respond,error=>respond({ok:false,error:"Não consegui " + stage + ". " + String(error?.message || "Reabra o navegador e tente novamente.").slice(0,180)}));
   return true;
 });
 chrome.tabs.onRemoved.addListener(id => chrome.storage.session.remove(extraTabKey(id)).catch(()=>{}));

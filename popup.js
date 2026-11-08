@@ -23,6 +23,7 @@ document.getElementById("new-note-tab").addEventListener("click", async () => {
   opener.setAttribute("aria-busy", "true");
   try {
     const result = await chrome.runtime.sendMessage({type:"nfse:new-note-tab"});
+    if (!result) { show("O navegador ainda não carregou a abertura de novas notas. Recarregue a extensão ou encerre e abra o navegador.",true); return; }
     if (!result?.ok) show(result?.error || "Não consegui abrir outra nota. Tente novamente.", true);
   } catch { show("Não consegui abrir outra nota. Reabra a extensão e tente novamente.", true); }
   finally { openingNoteTab = false; opener.disabled = false; opener.setAttribute("aria-busy", "false"); }
