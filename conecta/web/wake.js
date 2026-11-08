@@ -4,6 +4,8 @@
  const nativeReady=()=>{try{return window.NfseAndroid?.wakeSupported?.()===true;}catch{return false;}};
  const ready=()=>!!config?.enabled&&nativeReady();
  const canSubmit=()=>choice.checked&&ready()&&config.autoStart===true;
+ let preferenceLoaded=false;
+ const preferenceKey=()=> 'nfseWakeBefore:'+(pairing?.deviceId||pairing?.name||'pc');
  function draw(){
   const panel=$('wake-panel');panel.hidden=!pairing;
   choice.disabled=busy||!ready()||config.autoStart!==true;
@@ -12,12 +14,14 @@
   $('wake-status').textContent=!nativeReady()?'Instale o Android 1.4.0 ou superior para enviar o comando de despertar.':
    !config?.enabled?'No app do PC 1.6.0, abra Configurar ligar PC pela rede e salve o adaptador conectado por cabo.':
    !config.autoStart?'Ative Iniciar com o Windows no app do PC para receber as notas após entrar na sua conta.':
-   'Rede preparada para enviar o comando. O despertar ainda depende do teste neste PC.';
+   'Botão principal pronto para ligar e aguardar o PC. Configure também a entrada automática do Windows no PC de destino e faça o teste de inicialização.';
  }
  async function refresh(force=false){
   if(!pairing || !force&&Date.now()-lastFetch<15000)return;
   const current=pairing;lastFetch=Date.now();
-  try{const result=await api('/api/wake');if(pairing!==current)return;config=result.config;render();}catch{if(pairing===current){config=null;render();}}
+  try{const result=await api('/api/wake');if(pairing!==current)return;config=result.config;
+   if(!preferenceLoaded&&config?.enabled&&config.autoStart===true){let saved=null;try{saved=localStorage.getItem(preferenceKey());}catch{}choice.checked=saved===null?true:saved==='true';preferenceLoaded=true;}
+   render();}catch{if(pairing===current){config=null;render();}}
  }
  async function sendWake(){
   if(!ready())throw Error('Configure a rede no app do PC e atualize o Android primeiro.');
@@ -37,13 +41,13 @@
   if(pairing!==pending.current){pending.reject(Error('O pareamento mudou. Tente novamente.'));return;}
   result.ok?pending.resolve(result.message):pending.reject(Error(result.message||'Não foi possível enviar o comando.'));
  });
- choice.addEventListener('change',render);
+ choice.addEventListener('change',()=>{try{localStorage.setItem(preferenceKey(),String(choice.checked));}catch{}render();});
  $('wake-pc').onclick=async()=>{try{feedback(await sendWake());}catch(error){feedback(error.message);}};
  window.nfseWake={
   get canSubmit(){return canSubmit();},
   render:draw,refresh,
   async prepare(){if(online)return false;if(!canSubmit())throw Error('Conecte o PC ou marque Ligar e aguardar estando no mesmo Wi-Fi dele.');feedback(await sendWake());return true;},
-  reset(){config=null;choice.checked=false;lastFetch=0;draw();}
+  reset(){config=null;choice.checked=false;lastFetch=0;preferenceLoaded=false;draw();}
  };
  render();refresh(true);
 })();

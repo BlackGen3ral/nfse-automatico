@@ -5,6 +5,8 @@ using System.Net.NetworkInformation;
 using System.Net.Sockets;
 using System.Drawing;
 using System.Windows.Forms;
+using System.Diagnostics;
+using System.IO;
 
 internal sealed class WakeAdapter {
  public string Id,Name,Mac,Broadcast;
@@ -29,13 +31,19 @@ internal sealed class WakeAdapter {
  public static WakeAdapter Configure(Form owner,string selected,bool start,out bool autoStart){
   autoStart=start;var candidates=Available();
   if(candidates.Count==0){MessageBox.Show(owner,"Conecte este PC por cabo a uma rede local e tente novamente.","Ligar pela rede");return null;}
-  using(var form=new Form{Text="Ligar PC pela rede",ClientSize=new Size(470,300),FormBorderStyle=FormBorderStyle.FixedDialog,StartPosition=FormStartPosition.CenterParent,MaximizeBox=false,MinimizeBox=false,Font=new Font("Segoe UI",10),BackColor=Color.FromArgb(245,251,247)}){
+  using(var form=new Form{Text="Ligar PC pela rede",ClientSize=new Size(470,360),FormBorderStyle=FormBorderStyle.FixedDialog,StartPosition=FormStartPosition.CenterParent,MaximizeBox=false,MinimizeBox=false,Font=new Font("Segoe UI",10),BackColor=Color.FromArgb(245,251,247)}){
    form.Controls.Add(new Label{Text="Adaptador conectado por cabo",Location=new Point(20,20),AutoSize=true});
    var list=new ComboBox{Location=new Point(20,50),Size=new Size(430,30),DropDownStyle=ComboBoxStyle.DropDownList};foreach(var item in candidates)list.Items.Add(item);
    list.SelectedIndex=Math.Max(0,candidates.FindIndex(item=>item.Id==selected));form.Controls.Add(list);
    var startup=new CheckBox{Text="Iniciar o Conecta ao entrar no Windows",Checked=start,Location=new Point(20,100),AutoSize=true};form.Controls.Add(startup);
    form.Controls.Add(new Label{Text="No celular, use Ligar PC estando no mesmo Wi-Fi.\nO PC precisa de Wake-on-LAN ativado na BIOS e no driver.\nO acesso de outra rede depende de configuração adicional.\nApós iniciar, o Windows precisa entrar na sua conta.",Location=new Point(20,140),Size=new Size(430,85)});
-   var save=new Button{Text="Salvar configuração",Location=new Point(235,245),Size=new Size(215,36),DialogResult=DialogResult.OK};form.Controls.Add(save);form.AcceptButton=save;
+   var login=new Button{Text="Configurar entrada do Windows",Location=new Point(20,235),Size=new Size(430,36)};
+   login.Click+=delegate{
+    MessageBox.Show(form,"Na janela Contas de Usuário:\n\n1. Selecione a conta usada neste PC.\n2. Se estiver disponível, desmarque a opção que exige nome e senha para usar o computador.\n3. Clique em Aplicar. Para uma conta realmente sem senha, deixe os campos de senha vazios e confirme.\n\nSe a opção não aparecer, não altere outra conta: precisamos conferir as opções dessa versão do Windows.\n\nO Conecta abre a configuração; ele não confirma o login nem reinicia o PC. O teste de inicialização é que comprova o resultado.","Entrada automática · conta sem senha",MessageBoxButtons.OK,MessageBoxIcon.Information);
+    try{Process.Start(new ProcessStartInfo(Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.System),"netplwiz.exe")){UseShellExecute=true});}
+    catch(System.ComponentModel.Win32Exception){MessageBox.Show(form,"Não consegui abrir Contas de Usuário. Procure por netplwiz na pesquisa do Windows.","Entrada do Windows");}
+   };form.Controls.Add(login);
+   var save=new Button{Text="Salvar configuração da rede",Location=new Point(220,305),Size=new Size(230,36),DialogResult=DialogResult.OK};form.Controls.Add(save);form.AcceptButton=save;
    if(form.ShowDialog(owner)!=DialogResult.OK)return null;
    autoStart=startup.Checked;return (WakeAdapter)list.SelectedItem;
   }

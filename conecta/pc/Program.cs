@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.6.0";
+ public const string CurrentVersion="1.6.1";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {

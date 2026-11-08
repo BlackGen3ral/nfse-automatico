@@ -1,8 +1,8 @@
 {
   "pc": {
-    "version": "1.6.0",
+    "version": "1.6.1",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Conecta-PC.exe",
-    "sha256": "601828420fb2d957ba1b24068ac00918bab682a414b40c9fb5c17cbffea75538",
+    "sha256": "e33f20ab8bcee76359e8d30f29d23031c01914a99ab82aa77436737979448a81",
     "available": true
   },
   "android": {

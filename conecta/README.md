@@ -79,3 +79,7 @@ No Android, abra Ligar PC pela rede e use o botão estando no Wi-Fi da mesma red
 Marcando Ligar e aguardar o PC antes de preencher, um envio de uma nota ou lote pode aguardar até 30 minutos. A fila mantém os mesmos IDs para evitar duplicação e continua cancelável antes de o PC iniciar. Ao conectar, o PC abre o Chrome e a extensão segue o fluxo existente até a revisão, sem emissão automática. Windows, certificado e eventuais verificações ainda precisam permitir o acesso à sessão do usuário; não se configura login automático nem se armazena senha do Windows.
 
 Acordar por outra rede ainda requer um roteador ou aparelho intermediário configurado. O modelo Huawei HG8145X6-10-V2 foi identificado pelo usuário, mas não há integração validada com seu firmware. A UI informa que o modo de fora da rede está pendente. A API não expõe um botão remoto que finja enviar o pacote pela internet. Aplique server/migrations/004-wake.sql antes de publicar.
+
+### Entrada automática do Windows
+
+No PC 1.6.1, o diálogo Configurar ligar PC pela rede contém Configurar entrada do Windows. Ele apresenta as instruções e abre o painel nativo Contas de Usuário (netplwiz), para o usuário confirmar a configuração no PC de destino. O Conecta não simula teclas na área de login, não configura Winlogon diretamente, não recebe senhas e não reinicia o Windows. A disponibilidade da opção e o funcionamento após iniciar precisam ser confirmados nesse PC.
