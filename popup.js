@@ -76,7 +76,11 @@ function openSavedPicker(focusSearch = false) {
   positionSavedPicker();
   if (focusSearch) savedSearch.focus({preventScroll:true});
 }
-input.addEventListener("click", pasteCopiedCnpj);
+input.addEventListener("click", () => {
+  // Um campo preenchido precisa continuar editável sem sobrescrever o número
+  // nem levar o foco de volta para a descrição.
+  if (!input.value.trim()) pasteCopiedCnpj();
+});
 input.addEventListener("keydown", event => {
   if (event.key === "ArrowDown" && !event.isComposing) { event.preventDefault(); openSavedPicker(true); }
 });
