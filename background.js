@@ -77,28 +77,23 @@ async function editTab(action) {
   }
 }
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
-  if (message.type !== "nfse:new-note-tab") return;
+  if (message.type !== "nfse:expand-panel") return;
   const ownPanel = sender.id === chrome.runtime.id && (sender.url
     ? sender.url.split(/[?#]/)[0] === chrome.runtime.getURL("popup.html") : !sender.tab);
-  if (!ownPanel) { respond({ok:false,error:"Reabra o painel da extensão para abrir outra nota."}); return; }
-  let stage = "criar a nova guia";
+  if (!ownPanel) { respond({ok:false,error:"Reabra o painel da extensão para expandi-lo."}); return; }
   const task = (async () => {
-    // Registra a intenção antes de carregar o portal, evitando uma corrida
-    // entre a abertura da guia e o content script.
-    const tab = await editTab(()=>chrome.tabs.create({url:"about:blank",active:false}));
-    try {
-      stage = "preparar a nova nota";
-      await chrome.storage.session.set({[extraTabKey(tab.id)]:{until:Date.now()+9*60*1000,completed:false}});
-      stage = "abrir o portal na nova guia";
-      await editTab(()=>chrome.tabs.update(tab.id,{url:"https://www.nfse.gov.br/EmissorNacional/Dashboard",active:true}));
-      return {ok:true,tabId:tab.id};
-    } catch (error) {
-      await chrome.storage.session.remove(extraTabKey(tab.id)).catch(()=>{});
-      await chrome.tabs.remove(tab.id).catch(()=>{});
-      throw error;
+    const url = new URL(chrome.runtime.getURL("popup.html"));
+    url.searchParams.set("expanded","1");
+    if (Number.isInteger(message.sourceTabId) && message.sourceTabId >= 0) {
+      const source = await chrome.tabs.get(message.sourceTabId).catch(()=>null);
+      if (/^https:\/\/www\.nfse\.gov\.br\/EmissorNacional(?:[/?#]|$)/i.test(source?.url || "")) {
+        url.searchParams.set("sourceTab",String(source.id));
+      }
     }
+    const tab = await editTab(()=>chrome.tabs.create({url:url.href,active:true}));
+    return {ok:true,tabId:tab.id};
   })();
-  task.then(respond,error=>respond({ok:false,error:"Não consegui " + stage + ". " + String(error?.message || "Reabra o navegador e tente novamente.").slice(0,180)}));
+  task.then(respond,error=>respond({ok:false,error:"Não consegui expandir o painel. " + String(error?.message || "Reabra o navegador e tente novamente.").slice(0,180)}));
   return true;
 });
 chrome.tabs.onRemoved.addListener(id => chrome.storage.session.remove(extraTabKey(id)).catch(()=>{}));

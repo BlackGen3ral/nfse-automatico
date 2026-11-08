@@ -24,7 +24,7 @@ A extensão lê as exceções da etapa Pessoas quando o CNPJ do emitente corresp
 
 A extensão relê os campos que alterou antes de avançar. Se uma seleção, resposta ou valor tiver sido perdido pelo portal, ela interrompe a etapa e indica a pendência. O painel lateral mantém a lista de campos conferidos por etapa, sem registrar seus valores no histórico. O autodiagnóstico diferencia falta de internet, sessão expirada, verificação manual, avisos de validação e indisponibilidade do portal. As conferências verificam o preenchimento, não validam o enquadramento fiscal ou os cálculos do portal. A emissão continua manual.
 
-O botão ↗ ao lado da versão abre outra nota em uma nova guia: carrega o Dashboard e aciona Nova NFS-e — Emissão Completa quando o portal estiver autenticado. Se houver login, o acesso por certificado segue o mesmo caminho do app; a escolha do certificado ou PIN continua manual. A nova guia usa um rascunho separado e não recebe automaticamente tarefas enviadas pelo app do PC/celular. O rascunho da guia original é preservado.
+O botão ↗ ao lado da versão expande a própria extensão em uma nova guia, com o formulário maior. O painel expandido fica vinculado à guia do portal de origem e usa o mesmo rascunho, mesmo quando outra aba estiver ativa. Ao iniciar o preenchimento, o navegador volta ao portal para acompanhar o robô; a guia expandida permanece disponível. O botão ↗ nessa guia volta ao portal. A expansão não abre uma nova página da NFS-e.
 
 ## Instalação
 

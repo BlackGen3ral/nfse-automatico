@@ -14,7 +14,16 @@ let starting = false;
 let initializing = true;
 let draftKey;
 let refreshSequence = 0;
+const panelParams = new URLSearchParams(location.search);
+const expandedView = panelParams.get("expanded") === "1";
+const sourceParam = panelParams.get("sourceTab");
+const boundSourceTab = sourceParam !== null && /^\d+$/.test(sourceParam) && Number.isSafeInteger(Number(sourceParam)) ? Number(sourceParam) : null;
+document.body.classList.toggle("expanded-view", expandedView);
 let openingNoteTab = false;
+if (expandedView) {
+  document.getElementById("new-note-tab").title = "Voltar à guia do portal";
+  document.getElementById("new-note-tab").setAttribute("aria-label","Voltar à guia do portal");
+}
 document.getElementById("new-note-tab").addEventListener("click", async () => {
   if (openingNoteTab) return;
   const opener = document.getElementById("new-note-tab");
@@ -22,10 +31,16 @@ document.getElementById("new-note-tab").addEventListener("click", async () => {
   opener.disabled = true;
   opener.setAttribute("aria-busy", "true");
   try {
-    const result = await chrome.runtime.sendMessage({type:"nfse:new-note-tab"});
-    if (!result) { show("O navegador ainda não carregou a abertura de novas notas. Recarregue a extensão ou encerre e abra o navegador.",true); return; }
-    if (!result?.ok) show(result?.error || "Não consegui abrir outra nota. Tente novamente.", true);
-  } catch { show("Não consegui abrir outra nota. Reabra a extensão e tente novamente.", true); }
+    if (expandedView) {
+      const source = await targetTab();
+      if (source) await chrome.tabs.update(source.id,{active:true});
+      else show("A guia do portal foi fechada. Abra o painel lateral pela guia que deseja usar.",true);
+      return;
+    }
+    const result = await chrome.runtime.sendMessage({type:"nfse:expand-panel",sourceTabId:tab?.id});
+    if (!result) { show("O navegador ainda não carregou a expansão do painel. Recarregue a extensão ou encerre e abra o navegador.",true); return; }
+    if (!result?.ok) show(result?.error || "Não consegui expandir o painel. Tente novamente.", true);
+  } catch { show("Não consegui expandir o painel. Reabra a extensão e tente novamente.", true); }
   finally { openingNoteTab = false; opener.disabled = false; opener.setAttribute("aria-busy", "false"); }
 });
 let pastePending = false;
@@ -209,6 +224,10 @@ async function changeSavedCnpjs(cnpj, remove = false) {
 }
 document.getElementById("save-cnpj").onclick = () => changeSavedCnpjs(digits(input.value));
 async function closePanel() {
+  if (expandedView) {
+    if (tab) await chrome.tabs.update(tab.id,{active:true});
+    return;
+  }
   try {
     const current = await chrome.windows.getCurrent();
     await chrome.sidePanel.close({ windowId: current.id });
@@ -217,6 +236,11 @@ async function closePanel() {
   }
 }
 async function targetTab() {
+  if (expandedView) {
+    if (boundSourceTab !== null) return chrome.tabs.get(boundSourceTab).catch(()=>null);
+    const portals = await chrome.tabs.query({url:"https://www.nfse.gov.br/EmissorNacional/*",currentWindow:true});
+    return portals.find(item=>item.active) || (portals.length === 1 ? portals[0] : null);
+  }
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   return active;
 }
@@ -438,6 +462,7 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
       return;
     }
     if (message.type === "nfse:start") {
+      if (expandedView) { starting = false; await refresh(); }
       await closePanel();
       return;
     }
@@ -466,11 +491,22 @@ chrome.storage.onChanged.addListener((changes, area) => {
     setSuspension("no");
     showAmountHint();
     renderButton();
+  } else if (draftKey && changes[draftKey]?.newValue && !busy && !starting) {
+    // O painel lateral e a guia expandida editam o mesmo rascunho.
+    // Só substitui valores diferentes para preservar o cursor ao digitar.
+    const draft = changes[draftKey].newValue;
+    const cnpj = mask(digits(draft.cnpj || ""));
+    if (input.value !== cnpj) input.value = cnpj;
+    if (description.value !== (draft.description || "")) description.value = draft.description || "";
+    if (amount.value !== (draft.amount || "")) amount.value = draft.amount || "";
+    setSuspension(draft.suspension === "yes" ? "yes" : "no");
+    showAmountHint();
+    renderButton();
   }
   if (changes["nfseFlow:" + tab?.id]) refresh().catch(() => {});
 });
 chrome.tabs.onActivated.addListener(() => refresh().catch(() => {}));
-chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id) refresh().catch(() => {}); });
+chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id || (expandedView && !tab && boundSourceTab === null)) refresh().catch(() => {}); });
 chrome.tabs.onRemoved.addListener((id) => {
   if (id !== tab?.id) return;
   tab = null;
