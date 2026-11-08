@@ -141,3 +141,5 @@ main{padding-block:10px}
 #saved-cnpj-list .choose-cnpj{padding-block:7px}
 .picker-position{display:flex;align-items:center;gap:7px;flex:none;margin:9px 0 0;padding-top:8px;border-top:1px solid #edf2ee;font-size:10px;font-weight:400;color:#789481;cursor:pointer}
 .picker-position input{width:13px;height:13px;min-height:0;flex:none;margin:0;padding:0;accent-color:#218659;box-shadow:none}
+.field-paste{display:inline-flex;align-items:center;gap:6px;margin:0 0 8px;padding:0;border:0;background:none;color:#3c5145;font-family:inherit;font-size:12px;font-weight:600;line-height:1.5;cursor:pointer}
+.field-paste svg{color:#7b9a86;flex:none}.field-paste:hover:not(:disabled){color:#16805b}.field-paste:disabled{opacity:.65;cursor:default}

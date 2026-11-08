@@ -20,8 +20,8 @@
       <div id="people-fields">
         <div class="form-intro"><h2>Dados da nota</h2><span id="portal-state" class="portal-state">Aguardando portal</span></div>
         <div class="customer-fields">
-        <div class="label-row"><label for="cnpj">CNPJ do tomador</label><button id="save-cnpj" type="button" disabled>＋ Salvar</button></div>
-        <div class="cnpj-picker"><input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="00.000.000/0000-00" required aria-describedby="hint" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false"><button id="open-cnpjs" type="button" aria-label="Pesquisar CNPJs salvos" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false">⌄</button></div>
+        <div class="label-row"><button id="paste-cnpj" class="field-paste" type="button" title="Colar o CNPJ copiado e ir para a descrição" aria-label="Colar CNPJ do tomador e ir para a descrição"><span id="cnpj-label">CNPJ do tomador</span><svg width="12" height="12" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true"><rect x="7" y="7" width="10" height="11" rx="2"/><path d="M13 7V4a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v7a2 2 0 0 0 2 2h2"/></svg></button><button id="save-cnpj" type="button" disabled>＋ Salvar</button></div>
+        <div class="cnpj-picker"><input id="cnpj" name="cnpj" inputmode="numeric" autocomplete="off" maxlength="18" placeholder="00.000.000/0000-00" required aria-labelledby="cnpj-label" aria-describedby="hint" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false"><button id="open-cnpjs" type="button" aria-label="Pesquisar CNPJs salvos" aria-haspopup="dialog" aria-controls="saved-cnpjs" aria-expanded="false">⌄</button></div>
         <p id="hint">Também usado para o destinatário quando necessário.</p>
         <p id="saved-cnpj-status" class="saved-message" role="status" hidden></p>
         <section id="saved-cnpjs" popover="auto" role="dialog" aria-label="Pesquisar CNPJs salvos"><div class="saved-picker-heading"><strong>CNPJs salvos <span id="saved-cnpj-count"></span></strong><button id="close-cnpjs" type="button" aria-label="Fechar CNPJs salvos">×</button></div><label for="search-cnpj">Pesquisar CNPJ</label><input id="search-cnpj" type="search" inputmode="numeric" autocomplete="off" placeholder="Digite parte do CNPJ…"><ul id="saved-cnpj-list" aria-label="Escolher um CNPJ salvo"></ul><p id="saved-cnpj-empty" role="status" hidden></p><label class="picker-position"><input id="cnpj-picker-above" type="checkbox"><span>Abrir acima do campo</span></label></section>
@@ -35,7 +35,7 @@
           <div class="money">
             <label for="amount">Valor do serviço</label>
             <div class="amount-field"><span aria-hidden="true">R$</span><input id="amount" name="amount" inputmode="decimal" maxlength="20" placeholder="0,00" autocomplete="off" required aria-describedby="amount-hint"></div>
-            <p id="amount-hint">Exemplo: 1.234,56</p>
+            <p id="amount-hint">Use o formato 1.234,56. Enter para preencher.</p>
           </div>
           <fieldset class="tax-choice">
             <legend>Suspensão do ISSQN</legend>

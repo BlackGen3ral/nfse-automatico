@@ -14,6 +14,37 @@ let starting = false;
 let initializing = true;
 let draftKey;
 let refreshSequence = 0;
+let pastePending = false;
+document.getElementById("paste-cnpj").addEventListener("click", async () => {
+  if (input.disabled || pastePending) return;
+  const currentDraft = draftKey;
+  pastePending = true;
+  renderButton();
+  try {
+    const text = await navigator.clipboard.readText();
+    if (input.disabled || currentDraft !== draftKey) return;
+    const cnpj = text.trim().replace(/[\s./-]/g, "");
+    if (!/^\d{14}$/.test(cnpj)) {
+      closeSavedPicker();
+      input.focus({preventScroll:true});
+      show("Copie um CNPJ com 14 números e clique novamente no título do campo.");
+      return;
+    }
+    input.value = mask(cnpj);
+    closeSavedPicker();
+    onDraftEdit();
+    description.focus();
+  } catch {
+    if (!input.disabled && currentDraft === draftKey) {
+      closeSavedPicker();
+      input.focus({preventScroll:true});
+      show("Não consegui acessar o conteúdo copiado. Use Ctrl + V no campo CNPJ.");
+    }
+  } finally {
+    pastePending = false;
+    renderButton();
+  }
+});
 const savedCnpjsKey = "nfseSavedCnpjs";
 const pickerAboveKey = "nfseCnpjPickerAbove";
 let pickerAbove = false, positionSaving = false;
@@ -224,6 +255,7 @@ function renderButton() {
   for (const field of [input, description, amount, ...suspensionChoices]) {
     field.disabled = withoutCnpj || initializing || busy || starting;
   }
+  document.getElementById("paste-cnpj").disabled = input.disabled || pastePending;
   button.disabled = initializing || busy || starting ||
     (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14 || !invoiceData()));
   renderSavedCnpjs();
@@ -242,7 +274,7 @@ function showAmountHint() {
   amount.setAttribute("aria-invalid", String(invalid));
   document.querySelector("#amount-hint").textContent = invalid
     ? "Digite um valor maior que zero no formato 1.234,56."
-    : "Use o formato 1.234,56.";
+    : "Use o formato 1.234,56. Enter para preencher.";
 }
 function setSuspension(value) {
   for (const choice of suspensionChoices) choice.checked = choice.value === value;
@@ -288,6 +320,7 @@ for (const field of [input, description, amount]) field.addEventListener("keydow
   }
   if (event.ctrlKey || event.metaKey) return;
   event.preventDefault();
+  if (event.repeat) return;
   if (field === input) {
     if (digits(input.value).length === 14) description.focus();
     else show("Complete os 14 números do CNPJ antes de continuar.");
@@ -296,7 +329,7 @@ for (const field of [input, description, amount]) field.addEventListener("keydow
     show("Informe um valor maior que zero antes de continuar.");
   } else if (!description.value.trim()) description.focus();
   else if (digits(input.value).length !== 14) input.focus();
-  else if (!button.disabled) button.focus();
+  else if (!button.disabled) document.getElementById("fill-form").requestSubmit(button);
 });
 
 async function initialize() {

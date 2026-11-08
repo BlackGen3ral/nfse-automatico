@@ -26,7 +26,7 @@ A extensão relê os campos que alterou antes de avançar. Se uma seleção, res
 
 ## Instalação
 
-O painel coloca o foco no CNPJ ao abrir em Pessoas. Enter no CNPJ leva à descrição; na descrição, Enter mantém a quebra de linha e Ctrl+Enter leva ao valor. Enter no valor coloca o foco no botão de preenchimento, sem iniciar sozinho.
+O painel coloca o foco no CNPJ ao abrir em Pessoas. Enter no CNPJ leva à descrição; na descrição, Enter mantém a quebra de linha e Ctrl+Enter leva ao valor. Enter no valor inicia o preenchimento até a revisão quando os dados estão completos. Se faltar descrição ou CNPJ, o foco vai ao campo pendente. A emissão final continua manual. Clique no título **CNPJ do tomador** para colar o número copiado e ir direto à descrição. A área de transferência só é lida nesse clique; conteúdo fora do formato numérico de CNPJ não substitui o campo.
 
 Use **＋ Salvar** ao lado do CNPJ para adicioná-lo à lista local deste navegador. Clique no campo CNPJ ou na seta para abrir uma caixinha com os números salvos. Pesquise por parte do número, com ou sem pontuação, e clique em um resultado para usá-lo e continuar na descrição; use o × de cada resultado para removê-lo da lista. Por padrão, a caixinha abre abaixo do campo. Marque **Abrir acima do campo** dentro dela se preferir a posição superior; a escolha fica salva neste navegador. Se não houver espaço do lado escolhido, a busca se ajusta para caber na tela. Escape, o botão de fechar ou um clique fora fecham a busca. A lista permanece após fechar o painel ou o navegador e não é enviada ao GitHub. A escolha não inicia o preenchimento automaticamente.
 
