@@ -44,6 +44,7 @@ function render() {
   for (const id of ["cnpj", "description", "amount", "suspended"])
     if ($(id).disabled !== busy) $(id).disabled = busy;
   if (pairing) $("computer-name").textContent = pairing.name;
+  window.nfseBatch?.render();
 }
 function saveDraft() {
   sessionStorage.setItem(
@@ -90,6 +91,7 @@ $("pair-form").addEventListener("submit", async (event) => {
       method: "POST",
       body: JSON.stringify({ code: $("pair-code").value }),
     });
+    window.nfseBatch?.reset();
     pairing = data;
     online = false;
     busy = false;
@@ -122,6 +124,7 @@ $("invoice-form").addEventListener("submit", async (event) => {
     feedback("Confira os 14 números do CNPJ e o valor no formato 1.234,56.");
     return;
   }
+  if(window.nfseBatch?.enabled){window.nfseBatch.add({cnpj,description:$("description").value,amount,issqnSuspended:$("suspended").checked});return;}
   busy = true;
   render();
   feedback("Enviando ao computador…");
@@ -150,6 +153,7 @@ $("invoice-form").addEventListener("submit", async (event) => {
 });
 async function refresh() {
   if (!pairing || polling) return;
+  if(window.nfseBatch?.active){await window.nfseBatch.refresh();return;}
   const currentPair = pairing;
   polling = true;
   try {
@@ -226,6 +230,7 @@ $("stop-fill").onclick = async () => {
   } finally { stopping = false; }
 };
 $("new-note").onclick = () => {
+  window.nfseBatch?.reset();
   requestId = null;
   sessionStorage.removeItem("nfseRequest");
   $("invoice-form").scrollIntoView({
@@ -239,6 +244,7 @@ $("disconnect").onclick = async () => {
   if (!confirm("Desconectar este celular do computador?")) return;
   try {
     await api("/api/unpair", { method: "POST", body: "{}" });
+    window.nfseBatch?.reset();
     pairing = null;
     online = false;
     busy = false;

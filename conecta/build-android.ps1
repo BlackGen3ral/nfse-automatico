@@ -24,7 +24,7 @@ if($LASTEXITCODE -ne 0){throw 'Falha DEX'}
 if($LASTEXITCODE -ne 0){throw 'Falha recursos'}
 & "$jdk/bin/jar.exe" uf "$build/unsigned.apk" -C "$build/dex" classes.dex
 & "$tools/zipalign.exe" -f 4 "$build/unsigned.apk" "$build/aligned.apk"
-$key=Join-Path $env:LOCALAPPDATA 'NFSeConectaBuild'
+$key=if($env:NFSE_ANDROID_SIGNING_DIR){$env:NFSE_ANDROID_SIGNING_DIR}else{Join-Path $env:LOCALAPPDATA 'NFSeConectaBuild'}
 New-Item -ItemType Directory -Force -Path $key | Out-Null
 $passwordFile=Join-Path $key 'android-password.bin'
 if(!(Test-Path $passwordFile)){$bytes=New-Object byte[] 32;[Security.Cryptography.RandomNumberGenerator]::Create().GetBytes($bytes);$password=[Convert]::ToBase64String($bytes);[IO.File]::WriteAllBytes($passwordFile,[Security.Cryptography.ProtectedData]::Protect([Text.Encoding]::UTF8.GetBytes($password),$null,[Security.Cryptography.DataProtectionScope]::CurrentUser))}

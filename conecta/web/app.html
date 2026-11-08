@@ -11,6 +11,7 @@
     <link rel="icon" href="/icon.svg" />
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
+    <script src="/batch.js" defer></script>
     <script src="/jsQR.js" defer></script>
     <script src="/qr-scanner.js" defer></script>
   </head>
@@ -94,6 +95,8 @@
             suspensa</label
           >
           <p class="fine">Deixe desmarcado para informar “Não”.</p>
+          <label class="check"><input id="batch-mode" type="checkbox"> Lote simultâneo (2 a 5 notas · experimental)</label>
+          <section id="batch-draft" hidden><p>Adicione cada nota abaixo. O envio abre uma guia por nota e para na revisão.</p><div id="batch-notes"></div><button id="send-batch" type="button" class="button" disabled>Enviar lote ao PC</button></section>
           <button id="send" class="button">
             Preencher no PC <span>→</span>
           </button>
@@ -107,6 +110,7 @@
             ><span>Revisão</span>
           </div>
           <button id="stop-fill" class="button secondary" type="button" hidden>Parar preenchimento</button>
+          <div id="batch-progress" hidden></div><button id="stop-batch" class="button secondary" type="button" hidden>Parar lote inteiro</button>
           <button id="new-note" class="button secondary" hidden>
             Preparar outra nota
           </button>

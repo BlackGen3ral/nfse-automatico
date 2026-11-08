@@ -722,3 +722,12 @@ h3 {
 #qr-dialog::backdrop { background:rgb(0 30 20 / 65%); }
 #qr-video { display:block; width:100%; max-height:55vh; background:#10231b; border-radius:12px; object-fit:cover; }
 #qr-feedback { font-size:14px; line-height:1.5; }
+#batch-draft { margin:16px 0; padding:14px; border:1px solid var(--line); border-radius:14px; background:#f2faf5; }
+#batch-draft p { font-size:13px; line-height:1.5; overflow-wrap:anywhere; }
+#batch-notes p { padding:10px 0; border-top:1px solid var(--line); }
+#batch-notes .text-link { display:block; padding:6px 0; }
+#batch-progress { display:grid; gap:10px; margin:16px 0; }
+#batch-progress .app-card { margin:0; padding:14px; }
+#batch-progress p { font-size:13px; overflow-wrap:anywhere; }
+#batch-progress .button { min-height:44px; }
+#batch-progress[hidden],#batch-draft[hidden] { display:none; }

@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.4.2";
+ public const string CurrentVersion="1.5.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -45,7 +45,7 @@ internal static class Program {
 internal sealed class ConectaForm:Form {
  readonly HttpClient http=new HttpClient(new HttpClientHandler { AllowAutoRedirect=false }) { Timeout=TimeSpan.FromSeconds(15) };
  readonly object gate=new object();
- readonly SemaphoreSlim executionGate=new SemaphoreSlim(1,1);
+ static readonly SemaphoreSlim executionGate=new SemaphoreSlim(1,1);
  Dictionary<string,object> config=new Dictionary<string,object>();
  Dictionary<string,object> job;
  bool delivered;
@@ -68,11 +68,15 @@ internal sealed class ConectaForm:Form {
  int bridgePort=17846;
  DateTime openInvoiceUntil=DateTime.MinValue;
  readonly bool background;
+ readonly bool parallelWorker;
+ readonly List<ConectaForm> workers=new List<ConectaForm>();
+ bool workersStarted;
  static string Str(Dictionary<string,object> data,string key){return data.ContainsKey(key)&&data[key]!=null?Convert.ToString(data[key]):"";}
  static string Json(object value){return new JavaScriptSerializer().Serialize(value);}
  static Dictionary<string,object> Parse(string value){return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(value);}
  static string RandomKey(){var b=new byte[32];using(var rng=RandomNumberGenerator.Create())rng.GetBytes(b);return BitConverter.ToString(b).Replace("-","").ToLowerInvariant();}
- public ConectaForm(bool hidden){
+ public ConectaForm(bool hidden,bool worker=false){
+  parallelWorker=worker;
   background=hidden;Text="NFS-e Conecta";ClientSize=new Size(480,748);MinimumSize=new Size(496,787);BackColor=Color.FromArgb(245,251,247);Font=new Font("Segoe UI",10);StartPosition=FormStartPosition.CenterScreen;
   try{using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("logo")){var bitmap=new Bitmap(s);Icon=Icon.FromHandle(bitmap.GetHicon());}}catch{}
   var heading=new Label(){Text="NFS-e Conecta",Font=new Font("Segoe UI",22,FontStyle.Bold),ForeColor=Color.FromArgb(19,111,64),AutoSize=true,Location=new Point(28,25)};Controls.Add(heading);
@@ -104,14 +108,14 @@ internal sealed class ConectaForm:Form {
   qrTimer=new System.Windows.Forms.Timer(){Interval=1000};
   qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires)SetPairingLabel("QR expirado","Clique em Gerar novo QR code para conectar.");};
   qrTimer.Start();
-  tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=true};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
-  FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit){e.Cancel=true;Hide();}};
+  tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=!parallelWorker};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
+  FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit&&!parallelWorker){e.Cancel=true;Hide();}};
   Shown+=async delegate{if(background)Hide();await Initialize();};
  }
  Button Button(string text,int top){var b=new Button(){Text=text,Location=new Point(30,top),Size=new Size(420,40),FlatStyle=FlatStyle.Flat,BackColor=Color.White,ForeColor=Color.FromArgb(17,118,64)};b.FlatAppearance.BorderColor=Color.FromArgb(186,222,198);Controls.Add(b);return b;}
  void ShowWindow(){Show();WindowState=FormWindowState.Normal;Activate();}
  void SetStatus(string value){if(IsDisposed||!IsHandleCreated)return;if(InvokeRequired){BeginInvoke(new Action<string>(SetStatus),value);return;}status.Text=value;}
- void Save(){var bytes=Encoding.UTF8.GetBytes(Json(config));File.WriteAllBytes(Path.Combine(Program.Folder,"settings.bin"),ProtectedData.Protect(bytes,null,DataProtectionScope.CurrentUser));}
+ void Save(){if(parallelWorker)return;var bytes=Encoding.UTF8.GetBytes(Json(config));File.WriteAllBytes(Path.Combine(Program.Folder,"settings.bin"),ProtectedData.Protect(bytes,null,DataProtectionScope.CurrentUser));}
  async Task<Dictionary<string,object>> Api(string path,object data,bool authenticated){
   using(var message=new HttpRequestMessage(HttpMethod.Post,Program.Site+path)){
    if(authenticated)message.Headers.Authorization=new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer",Str(config,"pcToken"));
@@ -122,7 +126,7 @@ internal sealed class ConectaForm:Form {
   if(initializing)return;
   initializing=true;pair.Enabled=false;
   try {
-   var file=Path.Combine(Program.Folder,"settings.bin");if(File.Exists(file))config=Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(file),null,DataProtectionScope.CurrentUser)));
+   var file=Path.Combine(Program.Folder,"settings.bin");if(!parallelWorker&&File.Exists(file))config=Parse(Encoding.UTF8.GetString(ProtectedData.Unprotect(File.ReadAllBytes(file),null,DataProtectionScope.CurrentUser)));
    if(!config.ContainsKey("pcToken")){config=await Api("/api/register",new{name=Environment.MachineName},false);config["bridgeKey"]=RandomKey();Save();ShowPairCode(Str(config,"pairCode"));}
    else {code.Text="Conferindo conexão…";}
    if(!config.ContainsKey("bridgeKey")){config["bridgeKey"]=RandomKey();Save();}
@@ -138,7 +142,7 @@ internal sealed class ConectaForm:Form {
    ApplyPairingState(pairingState);
    if(!Convert.ToBoolean(pairingState["paired"]) && Str(pairingState,"pairCode")=="" && !Convert.ToBoolean(pairingState["activeJob"]))await Pair();
    lastId=Str(config,"lastJob");
-   if(lastId!="")try{await Api("/api/pc/progress",new{id=lastId,state="error",message="O programa do PC foi reiniciado. Confira o portal antes de enviar novamente."},true);}catch{}
+   if(!parallelWorker&&lastId!="")try{await Api("/api/pc/progress",new{id=lastId,state="error",message="O programa do PC foi reiniciado. Confira o portal antes de enviar novamente."},true);}catch{}
    for(int port=17846;port<=17861;port++) {
     var candidate=new TcpListener(IPAddress.Loopback,port);
     try{candidate.Start();listener=candidate;bridgePort=port;break;}
@@ -147,7 +151,7 @@ internal sealed class ConectaForm:Form {
    if(listener==null)throw new SocketException((int)SocketError.AddressAlreadyInUse);
    RunBackground(() => { AcceptLoop(); return Task.FromResult(0); });
    SetStatus(Convert.ToBoolean(pairingState["paired"])?"Celular conectado. Você já pode preparar uma nota.":"Conectado. Use Ler QR code do PC no celular para parear.");RunBackground(PollLoop);
-   await CheckUpdates(false);
+   if(!parallelWorker)await CheckUpdates(false);
   }catch(Exception error){try{File.WriteAllText(Path.Combine(Program.Folder,"connection-error.txt"),Program.CurrentVersion+" "+DateTime.UtcNow.ToString("O")+Environment.NewLine+error);}catch{}if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:error is SocketException?"Não foi possível abrir a conexão local. Feche outras instâncias do Conecta e tente novamente.":"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
   finally{initializing=false;pair.Enabled=true;if(listener==null)pair.Text="Tentar novamente";}
  }
@@ -210,10 +214,12 @@ internal sealed class ConectaForm:Form {
   await executionGate.WaitAsync();
   try {
    if(updating || exit) return;
-   var data=await Api("/api/pc/poll",new{},true);
+   bool ready;string current;lock(gate){ready=job==null&&!waitingForStop;current=job==null?null:Str(job,"id");}
+   var data=await Api("/api/pc/poll",new{ready=ready,parallel=true,jobId=current},true);
    ApplyPairingState(data);
+   if(!parallelWorker&&data.ContainsKey("paired")&&Convert.ToBoolean(data["paired"])&&!workersStarted){workersStarted=true;BeginInvoke(new Action(async()=>{for(int i=0;i<4;i++){var worker=new ConectaForm(true,true);lock(gate){worker.config=new Dictionary<string,object>(config);}var handle=worker.Handle;lock(workers){workers.Add(worker);}await worker.Initialize();}}));}
    var cancelId=Str(data,"cancelJobId");
-   if(cancelId!="")RequestCancellation(cancelId);
+   if(cancelId!=""&&job!=null&&Str(job,"id")==cancelId)RequestCancellation(cancelId);
    if(!data.ContainsKey("job") || data["job"]==null) return;
    var incoming=(Dictionary<string,object>)data["job"];
    var id=Str(incoming,"id");
@@ -296,6 +302,7 @@ internal sealed class ConectaForm:Form {
   var bytes=new byte[length];int offset=0;while(offset<length){var read=stream.Read(bytes,offset,length-offset);if(read<=0)return;offset+=read;}
   object result=new{ok=true};
   if(parts[0]=="GET"&&parts[1]=="/job"){lock(gate){
+   if(job!=null && Str(job,"batchId")!="" && (!map.ContainsKey("X-NFSe-Parallel") || map["X-NFSe-Parallel"]!="1")){pendingState="error";pendingText="Atualize a extensão para 0.8.0 ou superior antes de usar lotes.";Respond(stream,409,new{error=pendingText});return;}
    bool available=job!=null&&!delivered&&Str(job,"id")!=cancelledJobId;
    bool openRequested=openInvoiceUntil>DateTime.UtcNow;
    result=new{job=available?job:null,command=available||openRequested?"open-invoice":null,openUntil=openRequested?(openInvoiceUntil-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds:0,cancelledJobId=cancelledJobId};
@@ -322,8 +329,11 @@ internal sealed class ConectaForm:Form {
  }catch{} }}
  void Respond(NetworkStream stream,int statusCode,object result){var bytes=Encoding.UTF8.GetBytes(Json(result));var h=Encoding.ASCII.GetBytes("HTTP/1.1 "+statusCode+" OK\r\nContent-Type: application/json; charset=utf-8\r\nCache-Control: no-store\r\nAccess-Control-Allow-Origin: *\r\nContent-Length: "+bytes.Length+"\r\nConnection: close\r\n\r\n");stream.Write(h,0,h.Length);stream.Write(bytes,0,bytes.Length);}
  async Task CheckUpdates(bool manual) {
+  if(parallelWorker)return;
   await executionGate.WaitAsync();
   try {
+   ConectaForm[] snapshot;lock(workers){snapshot=workers.ToArray();}
+   foreach(var worker in snapshot){lock(worker.gate){if(worker.job!=null||worker.waitingForStop){if(manual)SetStatus("Conclua o lote antes de atualizar.");return;}}}
    lock(gate) {
     if(job!=null || waitingForStop) {
      if(manual) SetStatus("Conclua a solicitação atual antes de verificar atualizações.");

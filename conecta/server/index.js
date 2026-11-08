@@ -25,7 +25,7 @@ class ApiError extends Error {
     this.status = status;
   }
 }
-async function body(request) {
+async function body(request, maximum=16384) {
   if (!request.headers.get("content-type")?.includes("application/json"))
     throw new ApiError(415, "Envie os dados em JSON.");
   const reader = request.body?.getReader();
@@ -36,7 +36,7 @@ async function body(request) {
     const { done, value } = await reader.read();
     if (done) break;
     size += value.length;
-    if (size > 16384) {
+    if (size > maximum) {
       await reader.cancel();
       throw new ApiError(413, "Dados muito grandes.");
     }
@@ -207,24 +207,26 @@ async function api(request, env) {
     return json({ pairCode: code, expires: now + 300000 });
   }
   if (pc && path === "/api/pc/poll" && request.method === "POST") {
-    const stopping = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND cancel_requested=1 AND state IN('claimed','running')")
-      .bind(device.id).first();
+    const pollInput=await body(request);
+    const stopping = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND cancel_requested=1 AND state IN('claimed','running') AND (? IS NULL OR id=?)")
+      .bind(device.id,pollInput.jobId||null,pollInput.jobId||null).first();
     await db
       .prepare("UPDATE devices SET last_seen=? WHERE id=?")
       .bind(now, device.id)
       .run();
-    const job = await db
+    const job = pollInput.ready===false ? null : await db
       .prepare(
-        "UPDATE jobs SET state='claimed',message='Abrindo o portal no PC…' WHERE id=(SELECT id FROM jobs WHERE device_id=? AND state='queued' AND expires>? ORDER BY created LIMIT 1) AND state='queued' RETURNING *",
+        "UPDATE jobs SET state='claimed',message='Abrindo o portal no PC…' WHERE id=(SELECT id FROM jobs WHERE device_id=? AND state='queued' AND expires>? AND (batch_id IS NULL OR ?=1) ORDER BY created LIMIT 1) AND state='queued' RETURNING *",
       )
-      .bind(device.id, now)
+      .bind(device.id, now,pollInput.parallel===true?1:0)
       .first();
+    if(pollInput.parallel===true)await db.prepare("UPDATE devices SET parallel_ready=1 WHERE id=?").bind(device.id).run();
     return json({
       paired: !!device.mobile_hash,
       cancelJobId: stopping?.id || null,
       pairCode: device.pair_expires > now ? device.pair_code : null,
       job: job
-        ? { id: job.id, invoice: JSON.parse(job.payload), expires: job.expires }
+        ? { id: job.id, invoice: JSON.parse(job.payload), expires: job.expires, batchId:job.batch_id || null }
         : null,
     });
   }
@@ -264,6 +266,23 @@ async function api(request, env) {
       job,
     });
   }
+  if (!pc && path==='/api/batches/status' && request.method==='GET') {
+    const id=new URL(request.url).searchParams.get('id');if(!/^[a-f0-9-]{36}$/.test(id||''))throw new ApiError(400,'Lote inválido.');
+    const result=await db.prepare('SELECT id,state,message,created,cancel_requested AS cancelRequested FROM jobs WHERE device_id=? AND batch_id=? ORDER BY created,id').bind(device.id,id).all();
+    return json({online:now-device.last_seen<20000,jobs:result.results});
+  }
+  if (!pc && path==='/api/batches' && request.method==='POST') {
+    const data=await body(request,65536);
+    if(!/^[a-f0-9-]{36}$/.test(data.id||'')||!Array.isArray(data.notes)||data.notes.length<2||data.notes.length>5)throw new ApiError(400,'Monte um lote de 2 a 5 notas.');
+    const notes=data.notes.map(note=>{if(!/^[a-f0-9-]{36}$/.test(note.id||''))throw new ApiError(400,'Identificador inválido.');return{id:note.id,invoice:validateInvoice(note.invoice)};});
+    if(new Set(notes.map(note=>note.id)).size!==notes.length)throw new ApiError(400,'Notas duplicadas no lote.');
+    const old=await db.prepare('SELECT id FROM jobs WHERE device_id=? AND batch_id=?').bind(device.id,data.id).first();if(old)return json({id:data.id});
+    if(now-device.last_seen>=20000)throw new ApiError(409,'Conecte o PC antes de enviar o lote.');
+    if(!device.parallel_ready)throw new ApiError(409,'Atualize o app do PC para a versão 1.5.0 e abra-o antes de enviar lotes.');
+    const active=await db.prepare("SELECT id FROM jobs WHERE device_id=? AND state IN('queued','claimed','running')").bind(device.id).first();if(active)throw new ApiError(409,'Conclua ou pare o lote anterior.');
+    try{await db.batch(notes.map((note,index)=>db.prepare("INSERT INTO jobs(id,device_id,payload,state,message,created,expires,batch_id) VALUES(?,?,?,'queued','Lote enviado ao PC',?,?,?)").bind(note.id,device.id,JSON.stringify(note.invoice),now+index,now+600000,data.id)));}catch{throw new ApiError(409,'Não foi possível criar o lote. Confira se há notas em andamento.');}
+    return json({id:data.id},201);
+  }
   if (!pc && path === "/api/jobs/cancel" && request.method === "POST") {
     const input = await body(request);
     if (!/^[a-f0-9-]{36}$/.test(input.id || "")) throw new ApiError(400, "Solicitação inválida.");
@@ -293,6 +312,7 @@ async function api(request, env) {
         409,
         "Abra o NFS-e Conecta no computador e aguarde conectar.",
       );
+    if(await db.prepare("SELECT id FROM jobs WHERE device_id=? AND state IN('queued','claimed','running')").bind(device.id).first())throw new ApiError(409,'Já existe uma solicitação em andamento.');
     try {
       await db
         .prepare(

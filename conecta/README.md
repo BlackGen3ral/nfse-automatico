@@ -6,13 +6,13 @@ Site e API públicos em https://nfse-conecta.pages.dev. Cada computador possui u
 
 ## Distribuição Windows
 
-O executável 1.3.0 passou na verificação do Defender com marca de origem da Internet. O SHA-256 do arquivo está fixado em versions.json. A publicação reaproveita esse arquivo validado sem recompilar o Windows. A verificação não substitui o teste do programa no computador.
+O executável 1.5.0 é compilado com Roslyn e o SHA-256 do arquivo publicado está fixado em versions.json. Os testes locais de comunicação não equivalem a uma certificação por antivírus.
 
 ## Instalação
 
 1. No Windows, execute o programa e mantenha-o aberto. Quando uma versão estiver liberada, o executável roda da pasta onde foi salvo e continua na área perto do relógio quando a janela é fechada. O início com o Windows é opcional, pela caixa da interface.
-2. Instale a extensão 0.5.2 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
-3. No Android, instale o APK e leia o QR do PC com a câmera do celular, ou digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. Gerar outro código revoga o celular anterior.
+2. Instale a extensão 0.8.0 no Chrome usando Carregar sem compactação. Use o botão Abrir portal no programa e conclua a autenticação no portal. O primeiro uso configura a conexão local da extensão.
+3. No Android, instale o APK e leia o QR do PC com a câmera do celular, ou digite o código mostrado no PC. O código expira em 5 minutos e é consumido uma vez. O celular anterior permanece conectado até concluir um novo pareamento.
 4. Informe CNPJ, descrição e valor no Android. O computador precisa estar ligado e conectado. Certificado, PIN, login e CAPTCHA são tratados no computador. O usuário confere e confirma a emissão no portal.
 
 ## Atualizações
@@ -32,7 +32,7 @@ Para publicar uma melhoria, altere versions.json e as partes correspondentes, ex
 
 ## Consistência e dados
 
-A fila permite somente uma solicitação ativa por PC. Cada envio tem um identificador idempotente. O PC registra a entrega antes de abrir o portal, e a extensão mantém um registro por solicitação na sessão do navegador. Depois de uma interrupção incerta, a solicitação exige conferência antes de novo envio. O celular só recebe sucesso depois da chegada ao mesmo rascunho na revisão.
+O modo normal envia uma solicitação por vez. O lote experimental aceita de duas a cinco notas simultâneas, com um canal local e uma guia por nota. Exige PC 1.5.0 e extensão 0.8.0; versões antigas não recebem os dados do lote. O Android permite parar cada nota ou todo o lote. Se duas guias chegarem ao mesmo identificador de rascunho, a segunda é pausada. O comportamento de cinco rascunhos simultâneos ainda exige validação no portal real. Nenhum comando de emissão é enviado; todas as guias param na revisão. Cada envio tem um identificador idempotente. O PC registra a entrega antes de abrir o portal, e a extensão mantém um registro por solicitação na sessão do navegador. Depois de uma interrupção incerta, a solicitação exige conferência antes de novo envio. O celular só recebe sucesso depois da chegada ao mesmo rascunho na revisão.
 
 CNPJ, descrição e valor são transmitidos por HTTPS e permanecem no D1 até concluir ou expirar o comando. Uma rotina a cada 5 minutos limpa comandos vencidos. O conteúdo do comando é removido quando termina. O status é mantido por até cerca de 24 horas após o prazo do comando. Certificados e senhas do portal ficam no computador. Credenciais do programa Windows são protegidas por DPAPI para a conta atual do Windows.
 
@@ -46,7 +46,7 @@ O endereço Pages usa uma Function com o binding ORIGIN apontando para o Worker 
 
 ## Entrada por certificado
 
-No Windows 1.2.0, Configurar certificado seleciona um certificado instalado e cria uma regra AutoSelectCertificateForUrls para certificado.nfse.gov.br no Chrome. O Windows pode solicitar elevação para gravar a regra. A escolha permanece local. Após uma solicitação, a extensão 0.5.2 mantém a intenção por guia por até 9 minutos, abre o acesso por certificado na tela de login e segue para Pessoas ao chegar à página inicial. O preenchimento requer uma solicitação pendente válida. PINs de tokens continuam sujeitos à confirmação local.
+No Windows 1.2.0, Configurar certificado seleciona um certificado instalado e cria uma regra AutoSelectCertificateForUrls para certificado.nfse.gov.br no Chrome. O Windows pode solicitar elevação para gravar a regra. A escolha permanece local. Após uma solicitação, a extensão 0.8.0 mantém a intenção por guia por até 9 minutos, abre o acesso por certificado na tela de login e segue para Pessoas ao chegar à página inicial. O preenchimento requer uma solicitação pendente válida. PINs de tokens continuam sujeitos à confirmação local.
 
 Os testes automatizados cobrem login, navegação, expiração por guia e entrega única. O teste completo com a política aplicada e o certificado real no Chrome ainda precisa de validação.
 
@@ -65,3 +65,7 @@ Windows 1.4.1 tenta portas de loopback de 17846 a 17861 quando a porta padrão e
 Windows 1.4.2 inicia a conexão no Dashboard com a chave local no fragmento, para a extensão registrar a ponte antes do acesso por certificado. Abrir Emissão Completa no Chrome cria uma intenção de abertura com prazo de 9 minutos, mesmo sem dados de uma nota pendente. A extensão 0.5.6 aciona o atalho e confirma /opened quando Pessoas carrega. O fragmento é removido da página antes do acesso por certificado. As etapas de conexão e abertura apresentam mensagens locais na página.
 
 A abertura da versão 1.4.2 com a extensão 0.5.6 foi validada pela interface do app no PC. O comando abriu o Chrome e a página /EmissorNacional/DPS/Pessoas foi observada, junto da confirmação /opened no app. O teste de abertura foi realizado com o formulário vazio.
+
+## Lote experimental
+
+Ative Lote simultâneo no Android, preencha os dados de cada nota e toque em Adicionar nota ao lote. Após adicionar de duas a cinco notas, toque em Enviar notas simultaneamente. O PC deve estar conectado, autenticado no portal e com a extensão atualizada. A autenticação por certificado permanece no PC. Aplique server/migrations/003-parallel-batch.sql antes de publicar o backend.
