@@ -46,6 +46,7 @@ function render() {
   if (pairing) $("computer-name").textContent = pairing.name;
   window.nfseBatch?.render();
   window.nfseWake?.render();
+  window.nfsePower?.render();
 }
 function saveDraft() {
   sessionStorage.setItem(
@@ -94,6 +95,7 @@ $("pair-form").addEventListener("submit", async (event) => {
     });
     window.nfseBatch?.reset();
     window.nfseWake?.reset();
+    window.nfsePower?.reset();
     pairing = data;
     online = false;
     busy = false;
@@ -158,6 +160,7 @@ $("invoice-form").addEventListener("submit", async (event) => {
 async function refresh() {
   if (!pairing || polling) return;
   window.nfseWake?.refresh();
+  window.nfsePower?.refresh();
   if(window.nfseBatch?.active){await window.nfseBatch.refresh();return;}
   const currentPair = pairing;
   polling = true;
@@ -251,6 +254,7 @@ $("disconnect").onclick = async () => {
     await api("/api/unpair", { method: "POST", body: "{}" });
     window.nfseBatch?.reset();
     window.nfseWake?.reset();
+    window.nfsePower?.reset();
     pairing = null;
     online = false;
     busy = false;

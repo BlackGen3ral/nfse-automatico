@@ -1,4 +1,5 @@
 using System;
+using System.Linq;
 using System.Collections.Generic;
 using System.Drawing;
 using System.Diagnostics;
@@ -19,7 +20,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.6.1";
+ public const string CurrentVersion="1.7.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -71,6 +72,8 @@ internal sealed class ConectaForm:Form {
  readonly bool parallelWorker;
  readonly List<ConectaForm> workers=new List<ConectaForm>();
  bool workersStarted;
+ static volatile bool powerPending;
+ string powerId="";
  DateTime nextWakeSync=DateTime.MinValue;
  static string Str(Dictionary<string,object> data,string key){return data.ContainsKey(key)&&data[key]!=null?Convert.ToString(data[key]):"";}
  static string Json(object value){return new JavaScriptSerializer().Serialize(value);}
@@ -111,7 +114,7 @@ internal sealed class ConectaForm:Form {
   qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires)SetPairingLabel("QR expirado","Clique em Gerar novo QR code para conectar.");};
   qrTimer.Start();
   tray=new NotifyIcon(){Icon=Icon,Text="NFS-e Conecta",Visible=!parallelWorker};var menu=new ContextMenuStrip();menu.Items.Add("Abrir",null,delegate{ShowWindow();});menu.Items.Add("Sair",null,delegate{exit=true;Application.Exit();});tray.ContextMenuStrip=menu;tray.DoubleClick+=delegate{ShowWindow();};
-  FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit&&!parallelWorker){e.Cancel=true;Hide();}};
+  FormClosing+=delegate(object sender,FormClosingEventArgs e){if(!exit&&!parallelWorker&&e.CloseReason==CloseReason.UserClosing){e.Cancel=true;Hide();}};
   Shown+=async delegate{if(background)Hide();await Initialize();};
  }
  Button Button(string text,int top){var b=new Button(){Text=text,Location=new Point(30,top),Size=new Size(420,40),FlatStyle=FlatStyle.Flat,BackColor=Color.White,ForeColor=Color.FromArgb(17,118,64)};b.FlatAppearance.BorderColor=Color.FromArgb(186,222,198);Controls.Add(b);return b;}
@@ -227,7 +230,7 @@ internal sealed class ConectaForm:Form {
  async Task ClaimJob() {
   await executionGate.WaitAsync();
   try {
-   if(updating || exit) return;
+   if(updating || exit || powerPending) return;
    bool ready;string current;lock(gate){ready=job==null&&!waitingForStop;current=job==null?null:Str(job,"id");}
    var data=await Api("/api/pc/poll",new{ready=ready,parallel=true,jobId=current},true);
    ApplyPairingState(data);
@@ -257,10 +260,42 @@ internal sealed class ConectaForm:Form {
    }
   } finally { executionGate.Release(); }
  }
+ bool AnyNotesRunning(){
+  lock(gate){if(job!=null||waitingForStop)return true;}
+  ConectaForm[] snapshot;lock(workers){snapshot=workers.ToArray();}
+  foreach(var worker in snapshot){lock(worker.gate){if(worker.job!=null||worker.waitingForStop)return true;}}return false;
+ }
+ async Task PollPower(){
+  if(parallelWorker)return;
+  var result=await Api("/api/pc/power",new{},true);
+  var command=result.ContainsKey("command")?result["command"] as Dictionary<string,object>:null;
+  if(command==null || !new[]{"queued","scheduled"}.Contains(Str(command,"state"))){powerPending=false;powerId="";return;}
+  var id=Str(command,"id");var state=Str(command,"state");
+  if(AnyNotesRunning() || (powerId!=id && Str(config,"lastPower")==id) || (state=="scheduled"&&powerId!=id)){
+   await Api("/api/pc/power/ack",new{id=id,state="error"},true);powerPending=false;powerId="";return;
+  }
+  powerPending=true;
+  if(state=="queued"){
+   if(powerId!=id){powerId=id;lock(gate){config["lastPower"]=id;Save();}}
+   await Api("/api/pc/power/ack",new{id=id,state="scheduled"},true);
+   SetStatus("Desligamento solicitado pelo celular: salve seu trabalho. Você tem 10 segundos para cancelar no app.");return;
+  }
+  var due=Convert.ToInt64(command["deadline"]);
+  long now=(long)(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds;
+  var remaining=result.ContainsKey("remainingMs")&&result["remainingMs"]!=null?Convert.ToInt64(result["remainingMs"]):due-now;
+  var seconds=Math.Max(0,(int)Math.Ceiling(remaining/1000.0));
+  SetStatus("Desligando em "+seconds+" segundos. Salve seu trabalho ou cancele pelo celular.");
+  if(remaining>0)return;
+  var commit=await Api("/api/pc/power/commit",new{id=id},true);
+  if(!commit.ContainsKey("allowed")||!Convert.ToBoolean(commit["allowed"]))return;
+  powerId="";SetStatus("Pedido enviado ao Windows. Aplicativos com trabalho pendente podem impedir o desligamento.");
+  try{PowerShutdown.Request();}catch{await Api("/api/pc/power/ack",new{id=id,state="error"},true);powerPending=false;SetStatus("O Windows não aceitou o pedido de desligamento. Confira os aplicativos abertos e as permissões desta conta.");}
+ }
  async Task PollLoop() {
   DateTime nextUpdate=DateTime.UtcNow.AddMinutes(1);
   while(!exit) {
    try {
+    if(!parallelWorker)await PollPower();
     await ClaimJob();
     if(!parallelWorker&&DateTime.UtcNow>=nextWakeSync){await PublishWakeConfig();nextWakeSync=DateTime.UtcNow.AddMinutes(5);}
 
@@ -295,7 +330,7 @@ internal sealed class ConectaForm:Form {
      nextUpdate=DateTime.UtcNow.AddMinutes(15);
     }
    } catch { SetStatus("Reconectando ao serviço. Os dados da solicitação atual continuam preservados."); }
-   await Task.Delay(job!=null || pendingState=="cancelled"?1000:3000);
+   await Task.Delay(powerPending || job!=null || pendingState=="cancelled"?1000:3000);
   }
  }
  void RequestCancellation(string id) {
@@ -348,6 +383,7 @@ internal sealed class ConectaForm:Form {
   if(parallelWorker)return;
   await executionGate.WaitAsync();
   try {
+   if(powerPending){if(manual)SetStatus("Cancele o desligamento antes de atualizar.");return;}
    ConectaForm[] snapshot;lock(workers){snapshot=workers.ToArray();}
    foreach(var worker in snapshot){lock(worker.gate){if(worker.job!=null||worker.waitingForStop){if(manual)SetStatus("Conclua o lote antes de atualizar.");return;}}}
    lock(gate) {

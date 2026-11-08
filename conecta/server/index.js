@@ -1,6 +1,7 @@
 import { assets } from "./assets.js";
 import {diagnostics} from './diagnostics.js';
 import {validateWakeConfig,canWaitForPc} from './wake.js';
+import {power} from './power.js';
 const headers = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -176,6 +177,7 @@ async function api(request, env) {
   const pc = path.startsWith("/api/pc/"),
     device = await authenticate(request, db, pc ? "pc" : "mobile");
   await cleanup(db);
+  const powerResult=await power(request,db,device,pc,{body,json,ApiError});if(powerResult)return powerResult;
   if (pc && path === "/api/pc/status" && request.method === "POST") {
     const active = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND state IN('queued','claimed','running')")
       .bind(device.id).first();
@@ -343,6 +345,7 @@ async function api(request, env) {
         )
         .run();
     } catch (error) {
+      if (String(error).includes("PC shutting down"))throw new ApiError(409,"O PC está desligando. Cancele o desligamento ou aguarde antes de enviar notas.");
       if (String(error).includes("UNIQUE"))
         throw new ApiError(409, "Já existe uma solicitação em andamento.");
       throw error;

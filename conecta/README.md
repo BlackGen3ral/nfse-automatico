@@ -83,3 +83,11 @@ Acordar por outra rede ainda requer um roteador ou aparelho intermediário confi
 ### Entrada automática do Windows
 
 No PC 1.6.1, o diálogo Configurar ligar PC pela rede contém Configurar entrada do Windows. Ele apresenta as instruções e abre o painel nativo Contas de Usuário (netplwiz), para o usuário confirmar a configuração no PC de destino. O Conecta não simula teclas na área de login, não configura Winlogon diretamente, não recebe senhas e não reinicia o Windows. A disponibilidade da opção e o funcionamento após iniciar precisam ser confirmados nesse PC.
+
+## Desligar pelo celular (PC 1.7.0)
+
+Na seção Ligar PC pela rede do Android há Desligar PC. O celular pede confirmação; o PC conectado confirma o recebimento e inicia uma contagem de 10 segundos, cancelável no celular. Notas ativas ou na fila bloqueiam o comando, e o comando bloqueia novos envios durante o desligamento. As duas regras são verificadas na API e por gatilhos do banco para cobrir pedidos simultâneos.
+
+O Conecta faz a contagem e confirma novamente a autorização ao terminar. Somente então solicita shutdown.exe /s /t 0, sem /f; a contagem não é passada ao Windows porque um timeout positivo implica fechamento forçado. Aplicativos abertos podem impedir o desligamento. O estado Pedido enviado ao Windows não confirma que o PC desligou. Comandos expiram após dois minutos, são idempotentes e não são retomados automaticamente depois de um reinício incerto do Conecta.
+
+Aplicar server/migrations/005-power.sql antes da publicação. O Android usa a interface atualizada do site, sem novo APK para esta função. Os testes nativos devem substituir a ação de desligamento por uma simulação; nunca executar um desligamento real durante a validação automática.
