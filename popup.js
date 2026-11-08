@@ -15,7 +15,7 @@ let initializing = true;
 let draftKey;
 let refreshSequence = 0;
 let pastePending = false;
-document.getElementById("paste-cnpj").addEventListener("click", async () => {
+async function pasteCopiedCnpj() {
   if (input.disabled || pastePending) return;
   const currentDraft = draftKey;
   pastePending = true;
@@ -27,7 +27,7 @@ document.getElementById("paste-cnpj").addEventListener("click", async () => {
     if (!/^\d{14}$/.test(cnpj)) {
       closeSavedPicker();
       input.focus({preventScroll:true});
-      show("Copie um CNPJ com 14 números e clique novamente no título do campo.");
+      show("Copie um CNPJ com 14 números e clique novamente na caixinha do CNPJ.");
       return;
     }
     input.value = mask(cnpj);
@@ -44,7 +44,8 @@ document.getElementById("paste-cnpj").addEventListener("click", async () => {
     pastePending = false;
     renderButton();
   }
-});
+}
+document.getElementById("paste-cnpj").addEventListener("click", pasteCopiedCnpj);
 const savedCnpjsKey = "nfseSavedCnpjs";
 const pickerAboveKey = "nfseCnpjPickerAbove";
 let pickerAbove = false, positionSaving = false;
@@ -75,7 +76,7 @@ function openSavedPicker(focusSearch = false) {
   positionSavedPicker();
   if (focusSearch) savedSearch.focus({preventScroll:true});
 }
-input.addEventListener("click", () => openSavedPicker());
+input.addEventListener("click", pasteCopiedCnpj);
 input.addEventListener("keydown", event => {
   if (event.key === "ArrowDown" && !event.isComposing) { event.preventDefault(); openSavedPicker(true); }
 });
