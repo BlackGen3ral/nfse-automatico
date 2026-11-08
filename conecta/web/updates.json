@@ -12,8 +12,8 @@
     "versionCode": 5
   },
   "extension": {
-    "version": "0.8.0",
+    "version": "0.8.1",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Automatico.zip",
-    "sha256": "b5a17ae5ecde8e3b2e1d86311192ec9ba269bf8838292fb95317e14f64fc4cc4"
+    "sha256": "0cda42ef9b6be95d9e74af961ac40aa4dc280511b83cda0e77d18abf9f1dd94d"
   }
 }

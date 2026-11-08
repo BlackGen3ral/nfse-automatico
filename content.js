@@ -191,7 +191,7 @@
     });
     if (!option) return false;
     if (element.value === option.value) { remember(element, option.value); return true; }
-    if (element.disabled) return false;
+    if (element.disabled || element.hasAttribute("readonly")) return false;
     guide.point(element, true);
     const chosen = document.getElementById(element.id + "_chosen");
     if (visible(chosen)) {
@@ -821,7 +821,7 @@
       if (Observer && document.body) {
         observer = new Observer(wake);
         // Observadores do documento não atravessam o Shadow DOM do robô.
-        observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","selected","checked","aria-selected","aria-disabled","aria-expanded"]});
+        observer.observe(document.body,{subtree:true,childList:true,characterData:true,attributes:true,attributeFilter:["disabled","readonly","selected","checked","style","class","aria-selected","aria-disabled","aria-expanded"]});
       }
       document.addEventListener("input",wake,true);
       document.addEventListener("change",wake,true);
@@ -1065,6 +1065,45 @@
     return chosen;
   }
 
+  async function fillTaxClassification() {
+    const situationId = "ValorTributos_CodigoSituacaoTributaria";
+    const classificationId = "ValorTributos_CodigoClassificacaoTributaria";
+    const blocked = field => !field || field.disabled || field.hasAttribute("readonly");
+    let refreshing = null, stableSince = null, stableSituation, stableClassification;
+    return waitFor("Classificação tributária 000001 · aguardando a lista e a confirmação do portal", () => {
+      const situation = document.getElementById(situationId);
+      const classification = document.getElementById(classificationId);
+      const loading = visible(document.getElementById("modalLoading"));
+      if (loading || blocked(situation) || !classification) { stableSince = null; return false; }
+      if (refreshing) {
+        // O portal conserva as opções antigas durante a consulta e as substitui
+        // antes de limpar a seleção. Não confirme uma opção dessa lista antiga.
+        const options = Array.from(classification.options);
+        if (refreshing.field === classification && options.length === refreshing.options.length &&
+            options.every((option,index) => option === refreshing.options[index])) return false;
+        refreshing = null;
+      }
+      const oldSituation = situation.value;
+      const previousOptions = Array.from(classification.options);
+      if (!selectOption(situation,"000")) { stableSince = null; return false; }
+      if (situation.value !== oldSituation) {
+        refreshing = {field:classification,options:previousOptions};
+        stableSince = null;
+        return false;
+      }
+      const oldClassification = classification.value;
+      if (visible(document.getElementById("modalLoading")) || blocked(classification) ||
+          !selectOption(classification,"000001") || visible(document.getElementById("modalLoading"))) {
+        stableSince = null; return false;
+      }
+      if (classification.value !== oldClassification) stableSince = null;
+      if (stableSince === null || stableSituation !== situation || stableClassification !== classification) {
+        stableSince = Date.now(); stableSituation = situation; stableClassification = classification;
+      }
+      return Date.now() - stableSince >= 350;
+    },45000);
+  }
+
   async function fillValues(invoice = null) {
     await update("values", "Preenchendo Valores…", { invoice, invoiceDraft: invoice ? draftId() : null });
     const issues = [];
@@ -1089,10 +1128,7 @@
       "TributacaoFederal_PISCofins_SituacaoTributaria", "00"));
     if (pisReady) await attempt(() => select("Tipo de retenção do PIS/COFINS/CSLL",
       "TributacaoFederal_PISCofins_TipoRetencao", "0"));
-    const ibsReady = await attempt(() => select("Código de Situação Tributária",
-      "ValorTributos_CodigoSituacaoTributaria", "000"));
-    if (ibsReady) await attempt(() => select("Código de Classificação Tributária",
-      "ValorTributos_CodigoClassificacaoTributaria", "000001"));
+    await attempt(fillTaxClassification);
 
     const rateModeReady = await attempt(() => applyRadio(() => panel("pnlValorTributos"),
       "Informar alíquota do Simples Nacional", "Informar alíquota do Simples Nacional"));
@@ -1103,6 +1139,9 @@
     }));
 
     if (issues.length) throw new Error(issues.join(" · "));
+    // Outras alterações da etapa também podem disparar consultas do portal.
+    // Reponha a classificação perdida e espere o fim da consulta antes do Avançar.
+    await fillTaxClassification();
     if (!invoice) {
       await conferStage();
       await update("done", "Valores preenchidos. Confira os dados antes de avançar.");
