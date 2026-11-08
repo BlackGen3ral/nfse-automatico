@@ -1198,7 +1198,7 @@
       });
       const peopleLink = peopleLinks.find((link) => /Nova NFS-e - Emissão Completa/i.test(link.getAttribute?.("data-original-title") || link.title || "")) || peopleLinks[0];
       if (peopleLink && !peopleLink.dataset.nfseOpening) {
-        entryNotice("Comando recebido do PC. Abrindo Emissão Completa…");
+        entryNotice(state.local ? "Abrindo outra nota em Emissão Completa…" : "Comando recebido do PC. Abrindo Emissão Completa…");
         peopleLink.dataset.nfseOpening = "true";
         peopleLink.click();
       }

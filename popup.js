@@ -14,6 +14,19 @@ let starting = false;
 let initializing = true;
 let draftKey;
 let refreshSequence = 0;
+let openingNoteTab = false;
+document.getElementById("new-note-tab").addEventListener("click", async () => {
+  if (openingNoteTab) return;
+  const opener = document.getElementById("new-note-tab");
+  openingNoteTab = true;
+  opener.disabled = true;
+  opener.setAttribute("aria-busy", "true");
+  try {
+    const result = await chrome.runtime.sendMessage({type:"nfse:new-note-tab"});
+    if (!result?.ok) show(result?.error || "Não consegui abrir outra nota. Tente novamente.", true);
+  } catch { show("Não consegui abrir outra nota. Reabra a extensão e tente novamente.", true); }
+  finally { openingNoteTab = false; opener.disabled = false; opener.setAttribute("aria-busy", "false"); }
+});
 let pastePending = false;
 async function pasteCopiedCnpj() {
   if (input.disabled || pastePending) return;

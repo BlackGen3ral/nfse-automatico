@@ -1,0 +1,34 @@
+import fs from 'node:fs';
+import vm from 'node:vm';
+import assert from 'node:assert/strict';
+import {test} from 'node:test';
+
+test('Nova guia registra intenção antes de navegar e não interfere no rascunho ou nas tarefas do PC',async()=>{
+  const listeners=[],removed=[],events=[];
+  const session={'nfseFlow:5':{phase:'service',visualDraft:'original'},nfsePortalOwner:{tabId:5,until:Date.now()+60000}};
+  const local={nfseBridgeKey:'a'.repeat(64)};
+  const storage=store=>({get:async key=>({[key]:store[key]}),set:async value=>Object.assign(store,value),remove:async keys=>{for(const key of Array.isArray(keys)?keys:[keys])delete store[key];}});
+  const popup='chrome-extension://test/popup.html';let nextId=10;
+  const chrome={runtime:{getURL:()=>popup,onMessage:{addListener:fn=>listeners.push(fn)}},storage:{session:storage(session),local:storage(local)},sidePanel:{setPanelBehavior:async()=>{}},tabs:{onRemoved:{addListener:fn=>removed.push(fn)},create:async opts=>{events.push(['create',opts.url]);return{id:nextId++};},update:async(id,opts)=>{assert(session['nfseExtraTab:'+id]);events.push(['navigate',opts.url]);},remove:async()=>{},sendMessage:async()=>{throw Error('Não deve preencher automaticamente');}}};
+  vm.runInNewContext(fs.readFileSync(fs.existsSync('../background.js')?'../background.js':'../nfse-git/background.js','utf8'),{chrome,URL,AbortSignal,fetch:async()=>{throw Error('A nova guia não deve consultar o app do PC');}});
+  const send=(message,sender)=>new Promise(resolve=>{let handled=false;for(const listener of listeners)if(listener(message,sender,resolve))handled=true;if(!handled)resolve(null);});
+  const sourceBefore=JSON.stringify(session['nfseFlow:5']);
+  assert.equal((await send({type:'nfse:new-note-tab'},{url:'https://example.com'})).ok,false);
+  assert.equal(events.length,0);
+  const first=await send({type:'nfse:new-note-tab'},{url:popup});
+  assert.equal(first.ok,true);assert.equal(first.tabId,10);
+  assert.deepEqual(events,[['create','about:blank'],['navigate','https://www.nfse.gov.br/EmissorNacional/Dashboard']]);
+  assert.equal(JSON.stringify(session['nfseFlow:5']),sourceBefore);
+  assert.equal(session.nfsePortalOwner.tabId,5);
+  const page=path=>({tab:{id:10},url:'https://www.nfse.gov.br/EmissorNacional/'+path});
+  const login=await send({type:'nfse:portal-entry'},page('Login'));assert.equal(login.active,true);assert.equal(login.local,true);
+  const dashboard=await send({type:'nfse:portal-entry'},page('Dashboard'));assert.equal(dashboard.command,'open-invoice');
+  const people=await send({type:'nfse:portal-entry'},page('DPS/Pessoas'));assert.equal(people.active,false);
+  assert.equal((await send({type:'nfse:connect-pc'},page('DPS/Pessoas'))).connected,false);
+  assert.equal((await send({type:'nfse:portal-entry'},page('Dashboard'))).command,null);
+  const second=await send({type:'nfse:new-note-tab'},{url:popup});assert.equal(second.tabId,11);
+  assert.equal(session['nfseExtraTab:11'].completed,false);assert.equal(session['nfseExtraTab:10'].completed,true);
+  session['nfseExtraTab:11'].until=0;
+  assert.equal((await send({type:'nfse:portal-entry'},{tab:{id:11},url:'https://www.nfse.gov.br/EmissorNacional/Dashboard'})).active,false);
+  await Promise.all(removed.map(fn=>fn(10)));assert.equal(session['nfseExtraTab:10'],undefined);
+});

@@ -66,12 +66,42 @@ chrome.tabs.onRemoved.addListener(async (id) => {
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true }).catch((error) => console.error("Não foi possível configurar o painel NFS-e", error));
 
 const remoteInFlight = new Set();
+const extraTabKey = (id) => "nfseExtraTab:" + id;
+chrome.runtime.onMessage.addListener((message, sender, respond) => {
+  if (message.type !== "nfse:new-note-tab") return;
+  if (sender.url !== chrome.runtime.getURL("popup.html")) { respond({ok:false}); return; }
+  const task = (async () => {
+    // Registra a intenção antes de carregar o portal, evitando uma corrida
+    // entre a abertura da guia e o content script.
+    const tab = await chrome.tabs.create({url:"about:blank",active:true});
+    try {
+      await chrome.storage.session.set({[extraTabKey(tab.id)]:{until:Date.now()+9*60*1000,completed:false}});
+      await chrome.tabs.update(tab.id,{url:"https://www.nfse.gov.br/EmissorNacional/Dashboard"});
+      return {ok:true,tabId:tab.id};
+    } catch (error) {
+      await chrome.storage.session.remove(extraTabKey(tab.id)).catch(()=>{});
+      await chrome.tabs.remove(tab.id).catch(()=>{});
+      throw error;
+    }
+  })();
+  task.then(respond,()=>respond({ok:false,error:"Não consegui abrir outra nota. Tente novamente."}));
+  return true;
+});
+chrome.tabs.onRemoved.addListener(id => chrome.storage.session.remove(extraTabKey(id)).catch(()=>{}));
 chrome.runtime.onMessage.addListener((message, sender, respond) => {
   if (message.type !== "nfse:portal-entry" || sender.tab?.id == null) return;
   const url = new URL(sender.url);
   if (url.origin !== "https://www.nfse.gov.br" ||
       !/^\/EmissorNacional(?:\/|$)/i.test(url.pathname)) return;
   const task = (async () => {
+    const extra = (await chrome.storage.session.get(extraTabKey(sender.tab.id)))[extraTabKey(sender.tab.id)];
+    if (extra) {
+      if (/^\/EmissorNacional\/DPS\/Pessoas\/?$/i.test(url.pathname) && !extra.completed) {
+        await chrome.storage.session.set({[extraTabKey(sender.tab.id)]:{...extra,completed:true}});
+        return {active:false,local:true};
+      }
+      return {active:!extra.completed && extra.until>Date.now(),command:!extra.completed && extra.until>Date.now()?"open-invoice":null,local:true};
+    }
     const key = "nfsePortal:" + sender.tab.id;
     const ownerKey = "nfsePortalOwner";
     let state = (await chrome.storage.session.get(key))[key];
@@ -154,6 +184,7 @@ async function remoteControl(tabId) {
 async function connectRemote(message, sender) {
   const url = new URL(sender.url);
   if (url.origin !== "https://www.nfse.gov.br" || !/^\/EmissorNacional\/DPS\/Pessoas(?:\/|$)/i.test(url.pathname)) throw new Error("Conexão inválida.");
+  if ((await chrome.storage.session.get(extraTabKey(sender.tab.id)))[extraTabKey(sender.tab.id)]) return {ok:true,connected:false,local:true};
   const bridgeKey = message.bridgeKey || (await chrome.storage.local.get("nfseBridgeKey")).nfseBridgeKey;
   if (!/^[a-f0-9]{64}$/.test(bridgeKey)) return {ok:true,connected:false};
   await chrome.storage.local.set({nfseBridgeKey:bridgeKey});
