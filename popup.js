@@ -422,7 +422,7 @@ async function refresh() {
   }
   for (const item of current?.reviewReport?.items || []) {
     const entry=document.createElement("p");
-    entry.textContent=(item.status==="confirmed"?"✓ Confirmado: ":item.status==="changed"?"⚠ Diferente: ":"○ Conferir manualmente: ")+item.label+". Esperado: "+item.display+". Revisão: "+(item.actual ?? "Não localizado nesta tela")+".";
+    entry.textContent=(item.status==="confirmed"?"✓ Confirmado: ":item.status==="changed"?"⚠ Diferente: ":item.status==="stage-only"?"○ Conferido na etapa anterior: ":"○ Conferir manualmente: ")+item.label+". Esperado: "+item.display+". Revisão: "+(item.actual ?? (item.status==="stage-only"?"Não exibido nesta tela":"Não localizado nesta tela"))+".";
     auditContent.append(entry);
   }
   const inService = serviceUrl.test(tab?.url || "");

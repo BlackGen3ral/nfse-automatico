@@ -8,7 +8,7 @@
   const stageName = () => peoplePath.test(location.pathname) ? "Pessoas" : servicePath.test(location.pathname) ? "Serviço" : "Valores";
   function remember(field, expected) {
     if (!field) return;
-    const names = {Prestador_Inscricao:"CNPJ do emitente",Prestador_Nome:"Dados do emitente",Tomador_Inscricao:"CNPJ do tomador",Destinatario_Inscricao:"CNPJ do destinatário",DataCompetencia:"Data de competência",LocalPrestacao_CodigoPaisPrestacao:"País da prestação",LocalPrestacao_CodigoMunicipioPrestacao:"Município da prestação",ServicoPrestado_CodigoTributacaoNacional:"Código de Tributação Nacional",ServicoPrestado_CodigoNBS:"Item NBS",ServicoPrestado_CodigoIndOp:"Indicador da operação",ServicoPrestado_Descricao:"Descrição do serviço",Valores_ValorServico:"Valor do serviço",ValorTributos_AliquotaSN:"Alíquota do Simples Nacional",TributacaoFederal_PISCofins_SituacaoTributaria:"Situação do PIS/COFINS",TributacaoFederal_PISCofins_TipoRetencao:"Retenção do PIS/COFINS/CSLL",ValorTributos_CodigoSituacaoTributaria:"Situação tributária IBS/CBS",ValorTributos_CodigoClassificacaoTributaria:"Classificação tributária IBS/CBS"};
+    const names = {SimplesNacional_RegimeApuracaoTributosSN:"Regime de apuração do Simples Nacional",Prestador_Inscricao:"CNPJ do emitente",Prestador_Nome:"Dados do emitente",Tomador_Inscricao:"CNPJ do tomador",Destinatario_Inscricao:"CNPJ do destinatário",DataCompetencia:"Data de competência",LocalPrestacao_CodigoPaisPrestacao:"País da prestação",LocalPrestacao_CodigoMunicipioPrestacao:"Município da prestação",ServicoPrestado_CodigoTributacaoNacional:"Código de Tributação Nacional",ServicoPrestado_CodigoNBS:"Item NBS",ServicoPrestado_CodigoIndOp:"Indicador da operação",ServicoPrestado_Descricao:"Descrição do serviço",Valores_ValorServico:"Valor do serviço",ValorTributos_AliquotaSN:"Alíquota do Simples Nacional",TributacaoFederal_PISCofins_SituacaoTributaria:"Situação do PIS/COFINS",TributacaoFederal_PISCofins_TipoRetencao:"Retenção do PIS/COFINS/CSLL",ValorTributos_CodigoSituacaoTributaria:"Situação tributária IBS/CBS",ValorTributos_CodigoClassificacaoTributaria:"Classificação tributária IBS/CBS"};
     const label = names[field.id] || Array.from(field.labels || []).map(item => item.textContent.trim()).find(Boolean) ||
       field.id || field.name || "Campo preenchido";
     const key = field.type === "radio" ? field.name || field.id : field.id || field.name;
@@ -52,9 +52,36 @@
     }
     if (/Codigo(?:Tributacao|NBS|IndOp|Situacao|Classificacao)/.test(check.id)) {
       const code = value => String(value).match(/^\s*[\d.]+/)?.[0].replace(/\D/g,"");
+      if (check.id==="ServicoPrestado_CodigoTributacaoNacional" && /^\d{2}\.\d{2}\.\d{2}\.000$/.test(String(actual).trim())) return code(actual).slice(0,6)===code(check.display);
       if (code(check.display) && code(actual)===code(check.display)) return true;
     }
     return clean(actual)===clean(check.expected) || norm(actual)===norm(check.display);
+  }
+  function reviewFieldSpec(check) {
+    const specs = {
+      Prestador_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Informações do Emitente"},
+      Prestador_Nome:{aliases:["Nome/Razão Social"],section:"Informações do Emitente"},
+      Tomador_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Tomador/Adquirente do Serviço"},
+      Destinatario_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Destinatário do Serviço"},
+      DataCompetencia:{aliases:["Data de Competência"]},
+      ServicoPrestado_Descricao:{aliases:["Descrição do Serviço/Fornecimento"]},
+      LocalPrestacao_CodigoMunicipioPrestacao:{aliases:["Local do Fornecimento/Prestação do Serviço"],section:"Serviço Prestado"},
+      ServicoPrestado_CodigoTributacaoNacional:{aliases:["Código completo do serviço"],section:"Serviço Prestado"},
+      ServicoPrestado_CodigoNBS:{aliases:["Item da NBS correspondente ao serviço/fornecimento prestado"]},
+      ServicoPrestado_CodigoIndOp:{aliases:["Código indicador da operação"]},
+      Valores_ValorServico:{aliases:["Valor da operação/serviço prestado"]},
+      TributacaoFederal_PISCofins_SituacaoTributaria:{aliases:["Situação Tributária do PIS/COFINS/CSLL"]},
+      TributacaoFederal_PISCofins_TipoRetencao:{aliases:["Descrição Contribuições Sociais PIS/COFINS/CSLL"]},
+      ValorTributos_CodigoSituacaoTributaria:{aliases:["Código de Situação Tributária"],section:"IBS/CBS"},
+      ValorTributos_CodigoClassificacaoTributaria:{aliases:["Código de Classificação Tributária"],section:"IBS/CBS"}
+    };
+    if (specs[check.id]) return specs[check.id];
+    const label=norm(check.label.split(":")[0]);
+    if (label.includes("destinatario e o proprio adquirente")) return {aliases:["Para fins de apuração do IBS/CBS, o destinatário é o próprio adquirente"]};
+    if (label==="suspensao do issqn") return {aliases:["A exigibilidade do recolhimento do ISSQN devido nesta operação está suspensa?"]};
+    if (label==="retencao do issqn") return {aliases:["Há retenção do ISSQN pelo Tomador ou pelo Intermediário?"]};
+    const notShown=/compra governamental|localizacao do tomador|localizacao do destinatario|intermediario|pais da prestacao|imunidade exportacao|informar aliquota do simples|aliquota do simples/.test(label) || /SimplesNacional_RegimeApuracaoTributosSN|LocalPrestacao_CodigoPaisPrestacao|ValorTributos_AliquotaSN/.test(check.id);
+    return {aliases:[check.label.split(":")[0]],notShown};
   }
   function inspectReview(records) {
     const read = element => {
@@ -66,29 +93,26 @@
       return (element.innerText || element.textContent || "").trim();
     };
     const labels = Array.from(document.querySelectorAll("label,dt,th"));
+    const rows=labels.map(label=>({label:norm(label.textContent),section:norm(label.closest?.(".emissao-conteudo")?.previousElementSibling?.textContent),value:read(label.nextElementSibling)}));
+    const structured=rows.some(row=>row.section);
     const items = (records || []).flatMap(record => (record.checks || []).map(check => {
-      let actual = check.type === "radio" && check.name
+      const spec=reviewFieldSpec(check);
+      const candidates=rows.filter(row=>spec.aliases.some(alias=>norm(alias)===row.label) && (!spec.section || norm(spec.section)===row.section)).map(row=>row.value).filter(value=>value!==null && value!=="");
+      const unique=[...new Set(candidates)];
+      let actual = unique.length===1 ? unique[0] : null;
+      if (actual===null && !structured) actual = check.type === "radio" && check.name
         ? read(Array.from(document.querySelectorAll('input[type=radio]')).find(field=>field.name===check.name && field.checked))
-        : check.id ? read(document.getElementById(check.id)) : null;
-      if (actual === null) {
-        const wanted = norm(check.label.split(":")[0]);
-        const matches = labels.filter(label=>norm(label.textContent)===wanted);
-        const values = matches.map(label => {
-          const control = label.htmlFor && document.getElementById(label.htmlFor);
-          return control ? read(control) : read(label.nextElementSibling);
-        }).filter(value=>value!==null && value!=="");
-        const unique = [...new Set(values)];
-        if (unique.length===1) actual=unique[0];
-      }
-      return {...check,stage:record.stage,actual,status:actual===null?"missing":compareReviewValue(actual,check)?"confirmed":"changed"};
+        : check.id && document.getElementById(check.id)?.matches?.("input,select,textarea") ? read(document.getElementById(check.id)) : null;
+      return {...check,label:check.id==="SimplesNacional_RegimeApuracaoTributosSN"?"Regime de apuração do Simples Nacional":check.label,stage:record.stage,actual,status:actual===null?(structured && spec.notShown ? "stage-only":"missing"):compareReviewValue(actual,check)?"confirmed":"changed"};
     }));
     const confirmed=items.filter(item=>item.status==="confirmed").length;
     const changed=items.filter(item=>item.status==="changed").length;
     const missing=items.filter(item=>item.status==="missing").length;
+    const stageOnly=items.filter(item=>item.status==="stage-only").length;
     const summary = !items.length ? "Não há histórico suficiente para comparar esta revisão. Confira todos os dados no portal." :
-      "Revisão: " + confirmed + " confirmados, " + changed + " diferentes e " + missing + " não localizados na tela. " +
+      "Revisão: " + confirmed + " confirmados, " + changed + " diferentes e " + missing + " pendentes. " + (stageOnly ? stageOnly+" itens conferidos nas etapas anteriores não são exibidos nesta tela. " : "") +
       (changed ? "Confira as diferenças antes de emitir." : missing ? "Os itens não localizados precisam de conferência manual." : "Os campos comparados estão iguais ao preenchimento solicitado. Confira os cálculos e emita manualmente.");
-    return {items,confirmed,changed,missing,summary,checkedAt:Date.now()};
+    return {items,confirmed,changed,missing,stageOnly,summary,checkedAt:Date.now()};
   }
   let stopped = false, activeRemoteJobId = null;
   function ensureRunning() {
@@ -628,12 +652,12 @@
       reviewReport(report) {
         this.show(report.changed ? "error" : "review-ready",report.summary);
         card.dataset.reviewComplete=String(report.items.length>0 && !report.changed && !report.missing);
-        title.textContent = report.changed ? "Encontrei diferenças na revisão" : report.missing || !report.items.length ? "Falta conferir alguns itens" : "Tudo comparado! Agora é com você.";
+        title.textContent = report.changed ? "Encontrei diferenças na revisão" : report.missing || !report.items.length ? "Falta conferir alguns itens" : report.stageOnly ? "Os dados exibidos conferem!" : "Tudo comparado! Agora é com você.";
         reviewDetails.hidden = false;
         const list=reviewDetails.querySelector("ul");list.replaceChildren();
         for (const item of report.items) {
           const row=document.createElement("li");row.dataset.result=item.status;
-          row.textContent=(item.status==="confirmed"?"✓ ":item.status==="changed"?"⚠ ":"○ ")+item.label+"\nEsperado: "+item.display+"\nRevisão: "+(item.actual===null?"Não localizado — confira manualmente":item.actual);
+          row.textContent=(item.status==="confirmed"?"✓ ":item.status==="changed"?"⚠ ":"○ ")+item.label+"\nEsperado: "+item.display+"\nRevisão: "+(item.status==="stage-only"?"Conferido na etapa anterior; não exibido na revisão":item.actual===null?"Não localizado — confira manualmente":item.actual);
           list.append(row);
         }
         if (reviewDetails.open) { clearInterval(dismissTimer); root.querySelector(".dismiss-countdown").textContent="Resumo aberto · feche quando terminar de conferir"; }
