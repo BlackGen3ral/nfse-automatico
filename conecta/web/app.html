@@ -12,6 +12,7 @@
     <link rel="stylesheet" href="/style.css" />
     <script src="/app.js" defer></script>
     <script src="/batch.js" defer></script>
+    <script src="/wake.js" defer></script>
     <script src="/jsQR.js" defer></script>
     <script src="/qr-scanner.js" defer></script>
   </head>
@@ -58,6 +59,14 @@
           </div>
           <span id="online" class="pill">Verificando</span>
         </div>
+        <details id="wake-panel" class="app-card wake-panel">
+          <summary>Ligar PC pela rede</summary>
+          <p id="wake-status" role="status">Verificando a configuração…</p>
+          <button id="wake-pc" type="button" class="button secondary" disabled>Ligar PC no mesmo Wi-Fi</button>
+          <label class="check"><input id="wake-before-submit" type="checkbox" disabled>Ligar e aguardar o PC antes de preencher</label>
+          <p class="fine">Use o celular no mesmo Wi-Fi do PC conectado por cabo. As notas aguardam por até 30 minutos. O Windows precisa entrar na sua conta e iniciar o Conecta.</p>
+          <p class="fine">Fora da rede: configuração do roteador ou de um aparelho intermediário ainda necessária.</p>
+        </details>
         <form id="invoice-form" class="app-card">
           <div class="form-heading">
             <h1>Nova nota</h1>

@@ -731,3 +731,8 @@ h3 {
 #batch-progress p { font-size:13px; overflow-wrap:anywhere; }
 #batch-progress .button { min-height:44px; }
 #batch-progress[hidden],#batch-draft[hidden] { display:none; }
+
+.wake-panel { margin-bottom:16px; }
+.wake-panel summary { cursor:pointer; font-weight:650; }
+.wake-panel p { font-size:13px; line-height:1.5; }
+.wake-panel .check { margin-top:16px; }

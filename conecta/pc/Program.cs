@@ -19,7 +19,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.5.0";
+ public const string CurrentVersion="1.6.0";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -71,13 +71,14 @@ internal sealed class ConectaForm:Form {
  readonly bool parallelWorker;
  readonly List<ConectaForm> workers=new List<ConectaForm>();
  bool workersStarted;
+ DateTime nextWakeSync=DateTime.MinValue;
  static string Str(Dictionary<string,object> data,string key){return data.ContainsKey(key)&&data[key]!=null?Convert.ToString(data[key]):"";}
  static string Json(object value){return new JavaScriptSerializer().Serialize(value);}
  static Dictionary<string,object> Parse(string value){return new JavaScriptSerializer().Deserialize<Dictionary<string,object>>(value);}
  static string RandomKey(){var b=new byte[32];using(var rng=RandomNumberGenerator.Create())rng.GetBytes(b);return BitConverter.ToString(b).Replace("-","").ToLowerInvariant();}
  public ConectaForm(bool hidden,bool worker=false){
   parallelWorker=worker;
-  background=hidden;Text="NFS-e Conecta";ClientSize=new Size(480,748);MinimumSize=new Size(496,787);BackColor=Color.FromArgb(245,251,247);Font=new Font("Segoe UI",10);StartPosition=FormStartPosition.CenterScreen;
+  background=hidden;Text="NFS-e Conecta";ClientSize=new Size(480,Math.Min(798,Screen.PrimaryScreen.WorkingArea.Height-60));MinimumSize=new Size(496,650);AutoScroll=true;AutoScrollMinSize=new Size(0,798);BackColor=Color.FromArgb(245,251,247);Font=new Font("Segoe UI",10);StartPosition=FormStartPosition.CenterScreen;
   try{using(var s=Assembly.GetExecutingAssembly().GetManifestResourceStream("logo")){var bitmap=new Bitmap(s);Icon=Icon.FromHandle(bitmap.GetHicon());}}catch{}
   var heading=new Label(){Text="NFS-e Conecta",Font=new Font("Segoe UI",22,FontStyle.Bold),ForeColor=Color.FromArgb(19,111,64),AutoSize=true,Location=new Point(28,25)};Controls.Add(heading);
   Controls.Add(new Label(){Text="Seu Android conectado a este computador",AutoSize=true,Location=new Point(30,72),ForeColor=Color.FromArgb(82,113,93)});
@@ -101,10 +102,11 @@ internal sealed class ConectaForm:Form {
    }
    catch(Exception error){MessageBox.Show(this,error.Message,"Configuração do certificado",MessageBoxButtons.OK,MessageBoxIcon.Warning);}
   };
-  startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,674)};Controls.Add(startup);
+  var wake=Button("Configurar ligar PC pela rede",668);wake.Click+=async delegate{if(initializing||listener==null){SetStatus("Aguarde o app conectar antes de configurar a rede.");return;}bool autoStart;var adapter=WakeAdapter.Configure(this,Str(config,"wakeAdapter"),true,out autoStart);if(adapter==null)return;lock(gate){config["wakeAdapter"]=adapter.Id;Save();}startup.Checked=autoStart;if(await PublishWakeConfig())SetStatus("Rede preparada. No celular, abra Ligar PC. O teste de despertar ainda precisa ser feito.");};
+  startup=new CheckBox(){Text="Iniciar com o Windows",AutoSize=true,Location=new Point(31,724)};Controls.Add(startup);
   using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){startup.Checked=key!=null&&key.GetValue("NFSeConecta")!=null;}
-  startup.CheckedChanged+=delegate{try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
-  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Atualizações automáticas",AutoSize=true,Location=new Point(31,714),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
+  startup.CheckedChanged+=delegate{nextWakeSync=DateTime.MinValue;try{using(var key=Registry.CurrentUser.CreateSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){if(startup.Checked)key.SetValue("NFSeConecta","\""+Application.ExecutablePath+"\" --background");else key.DeleteValue("NFSeConecta",false);}}catch{SetStatus("Não foi possível alterar o início automático.");}};
+  Controls.Add(new Label(){Text="Versão "+Program.CurrentVersion+" · Atualizações automáticas",AutoSize=true,Location=new Point(31,764),Font=new Font("Segoe UI",8),ForeColor=Color.Gray});
   qrTimer=new System.Windows.Forms.Timer(){Interval=1000};
   qrTimer.Tick+=delegate{if(pairingQr.Image!=null && DateTime.UtcNow>=qrExpires)SetPairingLabel("QR expirado","Clique em Gerar novo QR code para conectar.");};
   qrTimer.Start();
@@ -154,6 +156,18 @@ internal sealed class ConectaForm:Form {
    if(!parallelWorker)await CheckUpdates(false);
   }catch(Exception error){try{File.WriteAllText(Path.Combine(Program.Folder,"connection-error.txt"),Program.CurrentVersion+" "+DateTime.UtcNow.ToString("O")+Environment.NewLine+error);}catch{}if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:error is SocketException?"Não foi possível abrir a conexão local. Feche outras instâncias do Conecta e tente novamente.":"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
   finally{initializing=false;pair.Enabled=true;if(listener==null)pair.Text="Tentar novamente";}
+ }
+ async Task<bool> PublishWakeConfig() {
+  if(parallelWorker)return false;
+  try {
+   string selected;lock(gate){selected=Str(config,"wakeAdapter");}
+   var adapter=WakeAdapter.Available().Find(item=>item.Id==selected);
+   bool autoStart=false;using(var key=Registry.CurrentUser.OpenSubKey("Software\\Microsoft\\Windows\\CurrentVersion\\Run")){autoStart=key!=null&&key.GetValue("NFSeConecta")!=null;}
+   if(adapter==null&&selected!="")return false;
+   if(adapter==null)await Api("/api/pc/wake-config",new{enabled=false,autoStart=autoStart},true);
+   else await Api("/api/pc/wake-config",new{enabled=true,autoStart=autoStart,mac=adapter.Mac,broadcast=adapter.Broadcast,adapter=adapter.Name},true);
+   return true;
+  } catch { SetStatus("Não foi possível sincronizar a opção de ligar pela rede. Tente novamente com a internet conectada.");return false; }
  }
  void RunBackground(Func<Task> action) {
   Task.Run(action).ContinueWith(task => {
@@ -248,6 +262,8 @@ internal sealed class ConectaForm:Form {
   while(!exit) {
    try {
     await ClaimJob();
+    if(!parallelWorker&&DateTime.UtcNow>=nextWakeSync){await PublishWakeConfig();nextWakeSync=DateTime.UtcNow.AddMinutes(5);}
+
     string state,text,idCurrent;
     lock(gate) {
      if(job!=null && !waitingForStop && (DateTime.UtcNow-jobStarted).TotalMinutes>9) {

@@ -39,12 +39,13 @@ async function api(path, options = {}) {
 function render() {
   $("pair-panel").hidden = !!pairing;
   $("invoice-panel").hidden = !pairing;
-  $("send").disabled = !online || busy;
+  $("send").disabled = busy || (!online && !window.nfseBatch?.enabled && !window.nfseWake?.canSubmit);
   $("scan-qr").disabled = busy;
   for (const id of ["cnpj", "description", "amount", "suspended"])
     if ($(id).disabled !== busy) $(id).disabled = busy;
   if (pairing) $("computer-name").textContent = pairing.name;
   window.nfseBatch?.render();
+  window.nfseWake?.render();
 }
 function saveDraft() {
   sessionStorage.setItem(
@@ -92,6 +93,7 @@ $("pair-form").addEventListener("submit", async (event) => {
       body: JSON.stringify({ code: $("pair-code").value }),
     });
     window.nfseBatch?.reset();
+    window.nfseWake?.reset();
     pairing = data;
     online = false;
     busy = false;
@@ -117,7 +119,7 @@ function amountValue() {
 }
 $("invoice-form").addEventListener("submit", async (event) => {
   event.preventDefault();
-  if (busy || !online) return;
+  if (busy || (!online && !window.nfseBatch?.enabled && !window.nfseWake?.canSubmit)) return;
   const amount = amountValue(),
     cnpj = $("cnpj").value.replace(/\D/g, "");
   if (!amount || cnpj.length !== 14) {
@@ -131,10 +133,12 @@ $("invoice-form").addEventListener("submit", async (event) => {
   requestId ||= crypto.randomUUID();
   sessionStorage.setItem("nfseRequest", requestId);
   try {
+    const waitForPc=await window.nfseWake?.prepare() || false;
     await api("/api/jobs", {
       method: "POST",
       body: JSON.stringify({
         requestId,
+        waitForPc,
         invoice: {
           cnpj,
           description: $("description").value,
@@ -153,6 +157,7 @@ $("invoice-form").addEventListener("submit", async (event) => {
 });
 async function refresh() {
   if (!pairing || polling) return;
+  window.nfseWake?.refresh();
   if(window.nfseBatch?.active){await window.nfseBatch.refresh();return;}
   const currentPair = pairing;
   polling = true;
@@ -181,7 +186,7 @@ async function refresh() {
     if (job) {
       $("progress-title").textContent =
         {
-          queued: "Enviado ao computador",
+          queued: online ? "Enviado ao computador" : "Aguardando o PC iniciar",
           claimed: "Abrindo o portal",
           running: "Preenchimento em andamento",
           review: "Tudo pronto para conferir",
@@ -245,6 +250,7 @@ $("disconnect").onclick = async () => {
   try {
     await api("/api/unpair", { method: "POST", body: "{}" });
     window.nfseBatch?.reset();
+    window.nfseWake?.reset();
     pairing = null;
     online = false;
     busy = false;

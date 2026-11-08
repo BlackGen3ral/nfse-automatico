@@ -1,7 +1,7 @@
 {
-  "pc": "1.5.0",
-  "android": "1.3.0",
-  "androidCode": 5,
+  "pc": "1.6.0",
+  "android": "1.4.0",
+  "androidCode": 6,
   "windowsAvailable": true,
-  "windowsApprovedSha256": "7bfc1e1356b3b06ed3e011318615ec708cb94c25a69315587a632806c92ee7b6"
+  "windowsApprovedSha256": "601828420fb2d957ba1b24068ac00918bab682a414b40c9fb5c17cbffea75538"
 }

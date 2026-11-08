@@ -94,6 +94,29 @@ public class MainActivity extends Activity {
  public final class AndroidBridge {
   @android.webkit.JavascriptInterface public String version(){return updates.version();}
   @android.webkit.JavascriptInterface public void checkUpdates(){runOnUiThread(()->updates.check(true));}
+  @android.webkit.JavascriptInterface public boolean wakeSupported(){return true;}
+  @android.webkit.JavascriptInterface public void wakeComputer(String request){
+   if(request==null || request.length()>1024)return;
+   runOnUiThread(()->{
+    String current=web.getUrl();if(current==null || !current.split("[?#]",2)[0].equals(ORIGIN+"/app"))return;
+    String id="";
+    try{
+     JSONObject data=new JSONObject(request);id=data.getString("id");
+     if(!id.matches("[a-f0-9-]{36}"))return;
+     final String requestId=id,mac=data.getString("mac"),broadcast=data.getString("broadcast");
+     android.net.ConnectivityManager manager=(android.net.ConnectivityManager)getSystemService(CONNECTIVITY_SERVICE);
+     android.net.Network network=manager.getActiveNetwork();
+     android.net.NetworkCapabilities capabilities=manager.getNetworkCapabilities(network);
+     if(network==null || capabilities==null || !capabilities.hasTransport(android.net.NetworkCapabilities.TRANSPORT_WIFI))throw new Exception("Conecte o celular ao Wi-Fi da mesma rede do PC. O acesso de fora ainda precisa ser configurado.");
+     new Thread(()->{try{WakeOnLan.send(network,mac,broadcast);wakeResult(requestId,true,"Comando enviado. Aguardando o PC conectar; isso ainda não confirma que ele ligou.");}catch(Exception error){wakeResult(requestId,false,"Não foi possível enviar o comando. Confira se o celular está no mesmo Wi-Fi do PC.");}},"nfse-wake").start();
+    }catch(Exception error){wakeResult(id,false,error.getMessage());}
+   });
+  }
+ }
+ private void wakeResult(String id,boolean ok,String message){
+  runOnUiThread(()->{if(web==null || isFinishing())return;String current=web.getUrl();if(current==null || !current.split("[?#]",2)[0].equals(ORIGIN+"/app"))return;
+   try{JSONObject data=new JSONObject();data.put("id",id);data.put("ok",ok);data.put("message",message);web.evaluateJavascript("window.dispatchEvent(new CustomEvent('nfse-wake-result',{detail:"+data.toString()+"}))",null);}catch(Exception ignored){}
+  });
  }
  @Override protected void onNewIntent(Intent intent) {
   super.onNewIntent(intent);

@@ -6,7 +6,7 @@ Site e API públicos em https://nfse-conecta.pages.dev. Cada computador possui u
 
 ## Distribuição Windows
 
-O executável 1.5.0 é compilado com Roslyn e o SHA-256 do arquivo publicado está fixado em versions.json. Os testes locais de comunicação não equivalem a uma certificação por antivírus.
+O executável 1.6.0 é compilado com Roslyn e o SHA-256 do arquivo publicado está fixado em versions.json. Os testes locais de comunicação não equivalem a uma certificação por antivírus.
 
 ## Instalação
 
@@ -69,3 +69,13 @@ A abertura da versão 1.4.2 com a extensão 0.5.6 foi validada pela interface do
 ## Lote experimental
 
 Ative Lote simultâneo no Android, preencha os dados de cada nota e toque em Adicionar nota ao lote. Após adicionar de duas a cinco notas, toque em Enviar notas simultaneamente. O PC deve estar conectado, autenticado no portal e com a extensão atualizada. A autenticação por certificado permanece no PC. Aplique server/migrations/003-parallel-batch.sql antes de publicar o backend.
+
+## Ligar o PC e aguardar a inicialização (Android 1.4.0 / PC 1.6.0)
+
+No PC de destino, abra Configurar ligar PC pela rede, selecione o adaptador Ethernet e mantenha Iniciar o Conecta ao entrar no Windows marcado. O programa registra MAC e broadcast na API privada desse pareamento. Não há dados de rede de clientes embutidos no código.
+
+No Android, abra Ligar PC pela rede e use o botão estando no Wi-Fi da mesma rede do PC. O app envia três magic packets UDP para a rede local. O retorno confirma o envio, não o despertar físico. A interface só considera o PC conectado após o Conecta responder ao serviço. O teste do hardware (suspensão e desligamento) continua necessário.
+
+Marcando Ligar e aguardar o PC antes de preencher, um envio de uma nota ou lote pode aguardar até 30 minutos. A fila mantém os mesmos IDs para evitar duplicação e continua cancelável antes de o PC iniciar. Ao conectar, o PC abre o Chrome e a extensão segue o fluxo existente até a revisão, sem emissão automática. Windows, certificado e eventuais verificações ainda precisam permitir o acesso à sessão do usuário; não se configura login automático nem se armazena senha do Windows.
+
+Acordar por outra rede ainda requer um roteador ou aparelho intermediário configurado. O modelo Huawei HG8145X6-10-V2 foi identificado pelo usuário, mas não há integração validada com seu firmware. A UI informa que o modo de fora da rede está pendente. A API não expõe um botão remoto que finja enviar o pacote pela internet. Aplique server/migrations/004-wake.sql antes de publicar.

@@ -1,5 +1,6 @@
 import { assets } from "./assets.js";
 import {diagnostics} from './diagnostics.js';
+import {validateWakeConfig,canWaitForPc} from './wake.js';
 const headers = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -230,6 +231,16 @@ async function api(request, env) {
         : null,
     });
   }
+  if (pc && path === '/api/pc/wake-config' && request.method === 'POST') {
+    let config;
+    try {config=validateWakeConfig(await body(request));}catch(error){if(error instanceof ApiError)throw error;throw new ApiError(400,error.message);}
+    await db.prepare('UPDATE devices SET wake_config=? WHERE id=?').bind(JSON.stringify(config),device.id).run();
+    return json({ok:true});
+  }
+  if (!pc && path === '/api/wake' && request.method === 'GET') {
+    let config;try{config=JSON.parse(device.wake_config||'null');}catch{config=null;}
+    return json({config,online:now-device.last_seen<20000,remoteReady:false});
+  }
   if (pc && path === "/api/pc/progress" && request.method === "POST") {
     const input = await body(request);
     if (
@@ -277,10 +288,12 @@ async function api(request, env) {
     const notes=data.notes.map(note=>{if(!/^[a-f0-9-]{36}$/.test(note.id||''))throw new ApiError(400,'Identificador inválido.');return{id:note.id,invoice:validateInvoice(note.invoice)};});
     if(new Set(notes.map(note=>note.id)).size!==notes.length)throw new ApiError(400,'Notas duplicadas no lote.');
     const old=await db.prepare('SELECT id FROM jobs WHERE device_id=? AND batch_id=?').bind(device.id,data.id).first();if(old)return json({id:data.id});
-    if(now-device.last_seen>=20000)throw new ApiError(409,'Conecte o PC antes de enviar o lote.');
+    const waiting=data.waitForPc===true;
+    if(waiting&&!canWaitForPc(device))throw new ApiError(409,'Configure Ligar pela rede no PC e ative o início automático.');
+    if(now-device.last_seen>=20000&&!waiting)throw new ApiError(409,'Conecte o PC antes de enviar o lote.');
     if(!device.parallel_ready)throw new ApiError(409,'Atualize o app do PC para a versão 1.5.0 e abra-o antes de enviar lotes.');
     const active=await db.prepare("SELECT id FROM jobs WHERE device_id=? AND state IN('queued','claimed','running')").bind(device.id).first();if(active)throw new ApiError(409,'Conclua ou pare o lote anterior.');
-    try{await db.batch(notes.map((note,index)=>db.prepare("INSERT INTO jobs(id,device_id,payload,state,message,created,expires,batch_id) VALUES(?,?,?,'queued','Lote enviado ao PC',?,?,?)").bind(note.id,device.id,JSON.stringify(note.invoice),now+index,now+600000,data.id)));}catch{throw new ApiError(409,'Não foi possível criar o lote. Confira se há notas em andamento.');}
+    try{await db.batch(notes.map((note,index)=>db.prepare("INSERT INTO jobs(id,device_id,payload,state,message,created,expires,batch_id) VALUES(?,?,?,'queued',?,?,?,?)").bind(note.id,device.id,JSON.stringify(note.invoice),waiting?'Aguardando o PC conectar (até 30 minutos). A emissão será manual.':'Lote enviado ao PC',now+index,now+(waiting?1800000:600000),data.id)));}catch{throw new ApiError(409,'Não foi possível criar o lote. Confira se há notas em andamento.');}
     return json({id:data.id},201);
   }
   if (!pc && path === "/api/jobs/cancel" && request.method === "POST") {
@@ -307,7 +320,9 @@ async function api(request, env) {
         throw new ApiError(409, "Solicitação inválida.");
       return json({ id: old.id });
     }
-    if (now - device.last_seen >= 20000)
+    const waiting=input.waitForPc===true;
+    if(waiting&&!canWaitForPc(device))throw new ApiError(409,'Configure Ligar pela rede no PC e ative o início automático.');
+    if (now - device.last_seen >= 20000 && !waiting)
       throw new ApiError(
         409,
         "Abra o NFS-e Conecta no computador e aguarde conectar.",
@@ -316,14 +331,15 @@ async function api(request, env) {
     try {
       await db
         .prepare(
-          "INSERT INTO jobs(id,device_id,payload,state,message,created,expires) VALUES(?,?,?,'queued','Solicitação enviada ao PC',?,?)",
+          "INSERT INTO jobs(id,device_id,payload,state,message,created,expires) VALUES(?,?,?,'queued',?,?,?)",
         )
         .bind(
           input.requestId,
           device.id,
           JSON.stringify(invoice),
+          waiting?'Aguardando o PC conectar (até 30 minutos). A emissão será manual.':'Solicitação enviada ao PC',
           now,
-          now + 600000,
+          now + (waiting?1800000:600000),
         )
         .run();
     } catch (error) {
