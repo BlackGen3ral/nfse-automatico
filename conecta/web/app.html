@@ -14,6 +14,7 @@
     <script src="/batch.js" defer></script>
     <script src="/wake.js" defer></script>
     <script src="/power.js" defer></script>
+    <script src="/claps.js" defer></script>
     <script src="/jsQR.js" defer></script>
     <script src="/qr-scanner.js" defer></script>
   </head>
@@ -60,6 +61,7 @@
           </div>
           <span id="online" class="pill">Verificando</span>
         </div>
+        <p id="pc-availability" class="fine" role="status">Verificando se o Conecta está respondendo.</p>
         <details id="wake-panel" class="app-card wake-panel">
           <summary>Ligar PC pela rede</summary>
           <p id="wake-status" role="status">Verificando a configuração…</p>
@@ -67,6 +69,15 @@
           <button id="power-shutdown" type="button" class="button secondary" disabled>Desligar PC</button>
           <button id="power-cancel" type="button" class="button secondary" hidden>Cancelar desligamento</button>
           <p id="power-status" role="status"></p>
+          <section class="wake-panel" aria-label="Controlar PC por duas palmas">
+            <strong>Duas palmas · experimental</strong>
+            <p>Ative para duas palmas controlarem o PC, mesmo com a tela apagada: conectado, pede desligamento imediato; sem conexão, envia o comando de ligar pelo mesmo Wi-Fi. Aguarde 15 segundos entre pedidos.</p>
+            <p class="fine">Usa o microfone e bateria por até 30 minutos. Áudio analisado no celular, sem salvar ou enviar. Outros ruídos podem causar ativações; teste a distância antes de usar no bolso. Esta versão não reconhece “Jarvis”.</p>
+            <label for="clap-sensitivity">Sensibilidade</label><select id="clap-sensitivity"><option value="pocket" selected>No bolso · maior sensibilidade</option><option value="normal">Normal · fora do bolso</option></select>
+            <button id="clap-start" type="button" class="button secondary">Ativar duas palmas</button>
+            <button id="clap-stop" type="button" class="button secondary" hidden>Parar escuta</button>
+            <p id="clap-status" role="status"></p>
+          </section>
           <label class="check"><input id="wake-before-submit" type="checkbox" disabled>Ligar e aguardar o PC antes de preencher</label>
           <p class="fine">Use o celular no mesmo Wi-Fi do PC conectado por cabo. As notas aguardam por até 30 minutos. O Windows precisa entrar na sua conta e iniciar o Conecta.</p>
           <p class="fine">Fora da rede: configuração do roteador ou de um aparelho intermediário ainda necessária.</p>

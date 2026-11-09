@@ -24,8 +24,8 @@ export async function power(request,db,device,pc,{body,json,ApiError}){
  }
  if(pc&&path==='/api/pc/power/ack'&&request.method==='POST'){
   const input=await body(request);if(!['scheduled','error'].includes(input.state))throw new ApiError(400,'Estado inválido.');
-  const due=now+10000;
-  await db.prepare("UPDATE power_commands SET state=?,deadline=COALESCE(deadline,?),message=? WHERE id=? AND device_id=? AND expires>? AND (state IN('queued','scheduled') OR (state='executed' AND ?='error'))").bind(input.state,due,input.state==='scheduled'?'Desligamento em 10 segundos. Salve seu trabalho; você pode cancelar no celular.':'O app do PC recusou o desligamento. Confira se há notas em andamento ou se ele reiniciou.',input.id,device.id,now,input.state).run();
+  const due=now;
+  await db.prepare("UPDATE power_commands SET state=?,deadline=COALESCE(deadline,?),message=? WHERE id=? AND device_id=? AND expires>? AND (state IN('queued','scheduled') OR (state='executed' AND ?='error'))").bind(input.state,due,input.state==='scheduled'?'Desligamento imediato confirmado pelo PC.':'O app do PC recusou o desligamento. Confira se há notas em andamento ou se ele reiniciou.',input.id,device.id,now,input.state).run();
   return json({ok:true});
  }
  if(pc&&path==='/api/pc/power/commit'&&request.method==='POST'){

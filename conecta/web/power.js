@@ -6,7 +6,7 @@
   $('power-shutdown').disabled=!online||busy||pending||!powerReady||!!(command&&['queued','scheduled','executed'].includes(command.state)&&command.expires>now());
   $('power-cancel').hidden=!active();$('power-cancel').disabled=pending;
   const seconds=command?.deadline?Math.max(0,Math.ceil((command.deadline-now())/1000)):null;
-  $('power-status').textContent=command?.state==='scheduled'?'Desligando em '+seconds+' s. Você pode cancelar.':
+  $('power-status').textContent=command?.state==='scheduled'?'PC confirmou o desligamento imediato.':
    active()?'Aguardando confirmação do PC…':
    command?.message||(!powerReady?'Atualize o app do PC para 1.7.0 para desligar pelo celular.':'Salve seu trabalho antes de desligar. Notas em andamento bloqueiam esta opção.');
  }
@@ -16,7 +16,7 @@
  }
  $('power-shutdown').onclick=async()=>{
   if(!online||busy||pending||!powerReady||active())return;
-  if(!confirm('Desligar o PC '+pairing.name+'? Salve seu trabalho. Após o PC confirmar, você terá 10 segundos para cancelar.'))return;
+  if(!confirm('Desligar o PC '+pairing.name+'? Salve seu trabalho. O pedido é imediato assim que o PC confirmar. Aplicativos com trabalho pendente podem impedir o desligamento.'))return;
   pending=true;draw();try{await api('/api/power/shutdown',{method:'POST',body:JSON.stringify({id:crypto.randomUUID()})});}catch(error){feedback(error.message);}finally{pending=false;await refresh(true);}
  };
  $('power-cancel').onclick=async()=>{

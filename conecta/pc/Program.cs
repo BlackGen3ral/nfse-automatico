@@ -20,7 +20,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.7.0";
+ public const string CurrentVersion="1.7.1";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -278,7 +278,7 @@ internal sealed class ConectaForm:Form {
   if(state=="queued"){
    if(powerId!=id){powerId=id;lock(gate){config["lastPower"]=id;Save();}}
    await Api("/api/pc/power/ack",new{id=id,state="scheduled"},true);
-   SetStatus("Desligamento solicitado pelo celular: salve seu trabalho. Você tem 10 segundos para cancelar no app.");return;
+   SetStatus("Desligamento imediato solicitado pelo celular.");await PollPower();return;
   }
   var due=Convert.ToInt64(command["deadline"]);
   long now=(long)(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds;

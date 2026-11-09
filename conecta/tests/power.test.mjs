@@ -9,7 +9,7 @@ function database(){
  const prepare=sql=>({bind(...args){return {async first(){return sqlite.prepare(sql).get(...args)||null;},async run(){return sqlite.prepare(sql).run(...args);}};}});
  return {sqlite,prepare};
 }
-test('Desligamento autenticado: 10 segundos, idempotência, cancelamento e bloqueio cruzado com notas',async()=>{
+test('Desligamento autenticado: imediato, idempotência, cancelamento e bloqueio cruzado com notas',async()=>{
  const DB=database();
  async function call(path,token,data){const r=await worker.fetch(new Request('https://test.local'+path,{method:data?'POST':'GET',headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},...(data?{body:JSON.stringify(data)}:{})}),{DB});return {status:r.status,data:await r.json()};}
  const pc=(await call('/api/register',null,{name:'PC power teste'})).data,mobile=(await call('/api/pair',null,{code:pc.pairCode})).data;
@@ -26,8 +26,7 @@ test('Desligamento autenticado: 10 segundos, idempotência, cancelamento e bloqu
  assert.equal((await call('/api/jobs',mobile.mobileToken,{requestId:crypto.randomUUID(),invoice})).status,409);
  assert.equal((await call('/api/pc/power',pc.pcToken,{})).data.command.id,id);
  const before=Date.now();await call('/api/pc/power/ack',pc.pcToken,{id,state:'scheduled'});
- const status=(await call('/api/power',mobile.mobileToken)).data;assert(status.command.deadline>=before+10000&&status.command.deadline<=Date.now()+10000);
- assert.equal((await call('/api/pc/power/commit',pc.pcToken,{id})).data.allowed,false,'Não executa antes de 10 segundos');
+ const status=(await call('/api/power',mobile.mobileToken)).data;assert(status.command.deadline>=before&&status.command.deadline<=Date.now());
  await call('/api/power/cancel',mobile.mobileToken,{id});
  DB.sqlite.prepare('UPDATE power_commands SET deadline=? WHERE id=?').run(Date.now()-1,id);
  assert.equal((await call('/api/pc/power/commit',pc.pcToken,{id})).data.allowed,false,'Parada confirmada não executa');
@@ -43,10 +42,10 @@ test('Mobile pede confirmação, envia só uma solicitação e permite cancelar 
  const elements={},calls=[];let command=null,confirmed=false;
  const element=id=>elements[id]||={hidden:false,disabled:false,textContent:''};
  const context={window:{},document:{hidden:false},pairing:{name:'PC teste'},online:true,busy:false,crypto,Date,setInterval:()=>1,$:element,confirm:()=>confirmed,feedback(){},
-  async api(path,options){calls.push(path);if(path==='/api/power/shutdown'){const id=JSON.parse(options.body).id;command={id,state:'scheduled',deadline:Date.now()+10000,expires:Date.now()+120000};}if(path==='/api/power/cancel')command={...command,state:'cancelled',message:'Cancelado'};return {ready:true,command};}};
+  async api(path,options){calls.push(path);if(path==='/api/power/shutdown'){const id=JSON.parse(options.body).id;command={id,state:'scheduled',deadline:Date.now(),expires:Date.now()+120000};}if(path==='/api/power/cancel')command={...command,state:'cancelled',message:'Cancelado'};return {ready:true,command};}};
  vm.runInNewContext(fs.readFileSync('web/power.js','utf8'),context);await new Promise(setImmediate);
  await element('power-shutdown').onclick();assert.equal(calls.filter(p=>p==='/api/power/shutdown').length,0);
- confirmed=true;await element('power-shutdown').onclick();assert.equal(calls.filter(p=>p==='/api/power/shutdown').length,1);assert.match(element('power-status').textContent,/10 s/);assert.equal(element('power-cancel').hidden,false);
+ confirmed=true;await element('power-shutdown').onclick();assert.equal(calls.filter(p=>p==='/api/power/shutdown').length,1);assert.match(element('power-status').textContent,/imediato/);assert.equal(element('power-cancel').hidden,false);
  await element('power-shutdown').onclick();assert.equal(calls.filter(p=>p==='/api/power/shutdown').length,1);
  await element('power-cancel').onclick();assert.equal(element('power-cancel').hidden,true);assert.equal(element('power-shutdown').disabled,false);
  context.busy=true;context.window.nfsePower.render();assert.equal(element('power-shutdown').disabled,true);

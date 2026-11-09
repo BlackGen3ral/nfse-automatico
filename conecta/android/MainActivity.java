@@ -20,6 +20,8 @@ public class MainActivity extends Activity {
  private static final String ORIGIN="https://nfse-conecta.pages.dev";
  private WebView web;
  private UpdateController updates;
+ private String pendingClap;
+ private boolean foreground;
  private android.webkit.PermissionRequest cameraRequest;
  @Override public void onCreate(Bundle state) {
   super.onCreate(state);
@@ -94,6 +96,16 @@ public class MainActivity extends Activity {
  public final class AndroidBridge {
   @android.webkit.JavascriptInterface public String version(){return updates.version();}
   @android.webkit.JavascriptInterface public void checkUpdates(){runOnUiThread(()->updates.check(true));}
+  @android.webkit.JavascriptInterface public boolean clapSupported(){return true;}
+  @android.webkit.JavascriptInterface public String clapStatus(){try{return new JSONObject().put("active",ClapService.active).put("message",ClapService.message).toString();}catch(Exception e){return "{}";}}
+  @android.webkit.JavascriptInterface public void stopClapMode(){runOnUiThread(()->{pendingClap=null;stopService(new Intent(MainActivity.this,ClapService.class));ClapService.message="Modo duas palmas desativado.";});}
+  @android.webkit.JavascriptInterface public void startClapMode(String input){runOnUiThread(()->{
+   String current=web.getUrl();if(!foreground||current==null||!current.split("[?#]",2)[0].equals(ORIGIN+"/app")||input==null||input.length()>1024)return;
+   try{JSONObject data=new JSONObject(input);if(!data.getString("token").matches("[a-f0-9]{64}")||data.optString("name").length()>100)return;
+    if(checkSelfPermission(android.Manifest.permission.RECORD_AUDIO)!=android.content.pm.PackageManager.PERMISSION_GRANTED||(android.os.Build.VERSION.SDK_INT>=33&&checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)!=android.content.pm.PackageManager.PERMISSION_GRANTED)){pendingClap=input;requestPermissions(android.os.Build.VERSION.SDK_INT>=33?new String[]{android.Manifest.permission.RECORD_AUDIO,android.Manifest.permission.POST_NOTIFICATIONS}:new String[]{android.Manifest.permission.RECORD_AUDIO},42);return;}
+    launchClaps(input);
+   }catch(Exception error){ClapService.message="Não consegui ativar o microfone. Confira a permissão do aplicativo.";}
+  });}
   @android.webkit.JavascriptInterface public boolean wakeSupported(){return true;}
   @android.webkit.JavascriptInterface public void wakeComputer(String request){
    if(request==null || request.length()>1024)return;
@@ -113,6 +125,12 @@ public class MainActivity extends Activity {
    });
   }
  }
+ private void launchClaps(String input)throws Exception{
+  android.app.NotificationManager manager=(android.app.NotificationManager)getSystemService(NOTIFICATION_SERVICE);android.app.NotificationChannel channel=manager.getNotificationChannel("clap-mode");
+  if(!manager.areNotificationsEnabled()||(channel!=null&&channel.getImportance()==android.app.NotificationManager.IMPORTANCE_NONE))throw new Exception("Ative as notificações para poder parar a escuta e cancelar pedidos.");
+  JSONObject data=new JSONObject(input);Intent intent=new Intent(this,ClapService.class).putExtra("token",data.getString("token")).putExtra("name",data.optString("name","PC")).putExtra("pocket",data.optBoolean("pocket",true));
+  startForegroundService(intent);
+ }
  private void wakeResult(String id,boolean ok,String message){
   runOnUiThread(()->{if(web==null || isFinishing())return;String current=web.getUrl();if(current==null || !current.split("[?#]",2)[0].equals(ORIGIN+"/app"))return;
    try{JSONObject data=new JSONObject();data.put("id",id);data.put("ok",ok);data.put("message",message);web.evaluateJavascript("window.dispatchEvent(new CustomEvent('nfse-wake-result',{detail:"+data.toString()+"}))",null);}catch(Exception ignored){}
@@ -126,8 +144,8 @@ public class MainActivity extends Activity {
    if(link.contains("#pair=")) web.loadUrl(link);
   }
  }
- @Override protected void onPause(){updates.pause();web.onPause();super.onPause();}
- @Override protected void onResume(){super.onResume();if(web!=null)web.onResume();if(updates!=null)updates.resume();}
+ @Override protected void onPause(){foreground=false;updates.pause();web.onPause();super.onPause();}
+ @Override protected void onResume(){super.onResume();foreground=true;if(web!=null)web.onResume();if(updates!=null)updates.resume();}
  @Override public void onWindowFocusChanged(boolean focused){
   super.onWindowFocusChanged(focused);
   if(focused && web!=null && !web.hasFocus()) web.requestFocus();
@@ -136,6 +154,7 @@ public class MainActivity extends Activity {
  @Override public void onBackPressed(){if(web.canGoBack())web.goBack();else super.onBackPressed();}
  @Override public void onRequestPermissionsResult(int code,String[] permissions,int[] results){
   super.onRequestPermissionsResult(code,permissions,results);
+  if(code==42&&pendingClap!=null){String input=pendingClap;pendingClap=null;if(results.length>0&&results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED&&(android.os.Build.VERSION.SDK_INT<33||checkSelfPermission(android.Manifest.permission.POST_NOTIFICATIONS)==android.content.pm.PackageManager.PERMISSION_GRANTED)){try{launchClaps(input);}catch(Exception e){ClapService.message="Não consegui iniciar a escuta. Abra o app e tente novamente.";}}else ClapService.message="Microfone ou notificações não autorizados. O modo permanece desativado.";}
   if(code==41 && cameraRequest!=null){
    if(results.length==1 && results[0]==android.content.pm.PackageManager.PERMISSION_GRANTED)
     cameraRequest.grant(new String[]{android.webkit.PermissionRequest.RESOURCE_VIDEO_CAPTURE});

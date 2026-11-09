@@ -1,15 +1,15 @@
 {
   "pc": {
-    "version": "1.7.0",
+    "version": "1.7.1",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Conecta-PC.exe",
-    "sha256": "35436e085f0b6b36bd59edc1a95d8afecb1697fdc5ad7adae380424523d5bdd2",
+    "sha256": "d7ca0a80fa840a73712a7f67450ec7c3444007b5139ee22e9c98cc24ec067111",
     "available": true
   },
   "android": {
-    "version": "1.4.0",
+    "version": "1.5.0",
     "url": "https://nfse-conecta.pages.dev/downloads/NFSe-Conecta.apk",
-    "sha256": "ff518e02476fdade6464fcd6a52c0c5bd7267ba020aa51325c29cdcd652ee677",
-    "versionCode": 6
+    "sha256": "99a97e26682dfac64a8657e159eb5999b671f67bbcd477799eae62dd23514398",
+    "versionCode": 7
   },
   "extension": {
     "version": "0.8.1",

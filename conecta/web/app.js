@@ -28,6 +28,7 @@ async function api(path, options = {}) {
   const data = await response.json();
   if (!response.ok) {
     if (response.status === 401 && pairing?.mobileToken === credential) {
+      window.nfseClaps?.reset();
       pairing = null;
       localStorage.removeItem("nfsePair");
       render();
@@ -47,6 +48,7 @@ function render() {
   window.nfseBatch?.render();
   window.nfseWake?.render();
   window.nfsePower?.render();
+  if($("pc-availability"))$("pc-availability").textContent=online?"O Conecta está respondendo no PC.":"Sem resposta do Conecta. O PC pode estar desligado, sem internet ou com o app fechado. A confirmação aparece quando ele conectar.";
 }
 function saveDraft() {
   sessionStorage.setItem(
@@ -96,6 +98,7 @@ $("pair-form").addEventListener("submit", async (event) => {
     window.nfseBatch?.reset();
     window.nfseWake?.reset();
     window.nfsePower?.reset();
+    window.nfseClaps?.reset();
     pairing = data;
     online = false;
     busy = false;
@@ -168,7 +171,7 @@ async function refresh() {
     const status = await api("/api/status");
     if (pairing !== currentPair) return;
     online = status.online;
-    $("online").textContent = online ? "PC conectado" : "PC desconectado";
+    $("online").textContent = online ? "PC conectado" : "PC sem conexão";
     $("online").dataset.online = String(online);
     const job = status.job;
     if (
@@ -255,6 +258,7 @@ $("disconnect").onclick = async () => {
     window.nfseBatch?.reset();
     window.nfseWake?.reset();
     window.nfsePower?.reset();
+    window.nfseClaps?.reset();
     pairing = null;
     online = false;
     busy = false;

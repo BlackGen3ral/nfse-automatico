@@ -91,3 +91,17 @@ Na seção Ligar PC pela rede do Android há Desligar PC. O celular pede confirm
 O Conecta faz a contagem e confirma novamente a autorização ao terminar. Somente então solicita shutdown.exe /s /t 0, sem /f; a contagem não é passada ao Windows porque um timeout positivo implica fechamento forçado. Aplicativos abertos podem impedir o desligamento. O estado Pedido enviado ao Windows não confirma que o PC desligou. Comandos expiram após dois minutos, são idempotentes e não são retomados automaticamente depois de um reinício incerto do Conecta.
 
 Aplicar server/migrations/005-power.sql antes da publicação. O Android usa a interface atualizada do site, sem novo APK para esta função. Os testes nativos devem substituir a ação de desligamento por uma simulação; nunca executar um desligamento real durante a validação automática.
+
+## Duas palmas experimental (Android 1.5.0)
+
+Na seção Ligar PC pela rede, ative Duas palmas e conceda microfone e notificações. Um serviço nativo de microfone mantém a escuta durante até 30 minutos, incluindo tela apagada, com notificação para parar a escuta e cancelar o pedido. Não há ativação automática no boot ou após encerramento do serviço pelo Android. O áudio fica somente em buffers de memória, sem arquivos ou envio; somente os comandos autenticados de energia são enviados à API. O pareamento é mantido em memória no serviço, sem persistir a credencial em arquivo novo. Trocar/desconectar o pareamento pelo app encerra a escuta.
+
+O detector usa dois impulsos curtos separados por 230 a 900 ms e um intervalo de 15 segundos após a detecção. Os testes sintéticos cobrem silêncio, palma isolada, par válido, eco, intervalo longo e som contínuo; não garantem rejeição de todos os ruídos reais. Música, distância e o bolso podem afetar a detecção. O reconhecimento da palavra Jarvis ainda não está implementado.
+
+Após a confirmação pelo PC, o desligamento agora é imediato, tanto para o botão como para as palmas. O Windows continua podendo impedir o desligamento se houver trabalho pendente. Não há prazo programado para cancelar depois da confirmação do PC. A estabilidade da escuta e as permissões precisam de teste no Motorola físico.
+
+### Alternar energia por palmas
+
+Duas palmas consultam a disponibilidade do Conecta. Se estiver conectado, solicitam desligamento imediato. Sem resposta, enviam Wake-on-LAN pelo Wi-Fi local, usando os dados configurados no PC. Falta de resposta não comprova desligamento: também pode significar aplicativo fechado ou falta de rede. O app usa o termo PC sem conexão e só confirma o retorno após receber resposta. Durante um desligamento em andamento, não repete o comando de desligar; o intervalo entre detecções é de 15 segundos. Ainda é necessário testar microfone, tela bloqueada, áudio de retorno e despertar físico no Motorola/PC reais.
+
+O modo No bolso (padrão) usa limiares menores e menor exigência de altas frequências; o modo Normal usa limiares mais restritos. Isso não garante captação através de qualquer tecido. A escuta continua nativa quando a WebView é pausada e pede permissão para microfone/notificações antes de iniciar.
