@@ -739,8 +739,29 @@
     if (health) return health.message;
     const field = Array.from(form.elements).find((item) => !item.disabled && (visible(item) || visible(document.getElementById(item.id + "_chosen"))) &&
       (item.validity?.valid === false || item.classList.contains("input-validation-error")));
-    const label = Array.from(field?.labels || []).map((item) => item.textContent.trim()).find(Boolean);
+    const label = field && validationFieldLabel(field);
     return label ? "Confira o campo " + label.slice(0, 120) + " na etapa " + stageName : "Confira os campos obrigatórios da etapa " + stageName;
+  }
+
+  function validationFieldLabel(field) {
+    const label = Array.from(field.labels || []).map(item => item.textContent.trim()).find(Boolean);
+    const key = field.name || field.id || "";
+    const section = {Tomador:"Tomador",Destinatario:"Destinatário",Prestador:"Emitente",Intermediario:"Intermediário"}[key.split(/[._]/)[0]];
+    const known = {CEP:"CEP",CodigoMunicipio:"Município",NomeMunicipio:"Município",Logradouro:"Logradouro",Numero:"Número",Bairro:"Bairro",Inscricao:"CPF/CNPJ",Nome:"Nome",DataCompetencia:"Data de competência"};
+    const name = label || known[key.split(/[._]/).at(-1)];
+    return [section, name].filter(Boolean).join(" · ");
+  }
+
+  function portalFieldErrors() {
+    return Array.from(document.querySelectorAll(".field-validation-error")).filter(visible).flatMap(item => {
+      const text = (item.innerText || item.textContent || "").trim();
+      if (!text) return [];
+      const key = item.getAttribute?.("data-valmsg-for");
+      const field = key && (document.getElementById(key.replace(/[.]/g,"_")) ||
+        Array.from(document.getElementsByName?.(key) || []).find(visible));
+      const label = field && validationFieldLabel(field);
+      return [label ? label + ": " + text : text];
+    });
   }
 
   function advanceButton(fieldId, stagePath, stageName) {
@@ -771,8 +792,9 @@
 
   function portalHealth() {
     if (typeof navigator !== "undefined" && navigator.onLine === false) return {kind:"offline", message:"Este computador está sem conexão. Reconecte a internet antes de retomar."};
-    const alerts = Array.from(document.querySelectorAll(".alert-danger,.alert-warning,.validation-summary-errors li,.field-validation-error"))
-      .filter(visible).map((item) => (item.innerText || item.textContent || "").trim()).filter(Boolean);
+    const alerts = Array.from(document.querySelectorAll(".alert-danger,.alert-warning,.validation-summary-errors li"))
+      .filter(visible).map((item) => (item.innerText || item.textContent || "").trim())
+      .filter(text => text && !/^(?:x )?preencha o formulario conforme orientacoes abaixo(?: x)?$/.test(norm(text)));
     const text = alerts.join(" · ").slice(0, 300);
     if (visible(document.querySelector("input[type=password]")) || /sessao.*(?:expir|encerr)|autenticacao.*necess|faca.*login/.test(norm(text))) {
       return { kind: "session", message: "A sessão do portal expirou. Entre novamente e abra o mesmo rascunho para continuar." };
@@ -780,6 +802,8 @@
     if (Array.from(document.querySelectorAll("iframe[src*=recaptcha],iframe[src*=hcaptcha],[id*=captcha] input")).some(visible)) {
       return { kind: "captcha", message: "O portal solicitou uma verificação. Conclua-a manualmente para continuar." };
     }
+    const fields = portalFieldErrors();
+    if (fields.length) return {kind:"validation",message:[...new Set(fields)].join(" · ").slice(0,300)};
     if (text) {
       const hasFieldError = Array.from(document.querySelectorAll(".validation-summary-errors li,.field-validation-error")).some((item) => visible(item) && item.textContent.trim());
       const transient = !hasFieldError && /temporari|indisponiv|tente novamente|nao foi possivel recuperar|erro de conexao|falha de conexao/.test(norm(text));
@@ -886,12 +910,29 @@
     return (field?.value || field?.textContent || "").trim();
   }
 
+  // O portal registra o documento consultado no campo oculto do mesmo grupo.
+  // Preserve o endereço digitado quando o usuário retomar a mesma pessoa.
+  function lookupConfirmed(input, documentNumber) {
+    const group = input.closest(".form-group");
+    return DIGITS(input.value) === documentNumber &&
+      Array.from(group?.querySelectorAll("input[type=hidden]") || []).some(field => field.value === documentNumber);
+  }
+
   async function lookup(scope, stem, label, documentNumber) {
     const type = documentNumber.length === 11 ? "CPF" : "CNPJ";
     const field = () => findDocumentInput(scope(), stem);
     const input = await waitFor(label + " · campo de " + type, () => visible(field()) && field());
     const previousDocument = DIGITS(input.value);
     const previousName = lookupName(scope(), stem);
+    const recordLookup = () => {
+      remember(field(), field().value);
+      confirmations.set(stem + "_consulta", {label:label + " · dados pesquisados",check:() =>
+        DIGITS(field()?.value) === documentNumber && !!lookupName(scope(), stem)});
+    };
+    if (previousName && lookupConfirmed(input, documentNumber)) {
+      recordLookup();
+      return;
+    }
     const formatted = type === "CPF"
       ? documentNumber.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")
       : documentNumber.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
@@ -914,8 +955,7 @@
         (previousDocument === documentNumber || nameWasCleared || name !== previousName);
     }, 12000);
     });
-    confirmations.set(stem + "_consulta", {label: label + " · dados pesquisados", check: () =>
-      DIGITS(field()?.value) === documentNumber && !!lookupName(scope(), stem)});
+    recordLookup();
   }
 
   async function prepareIssuer() {
@@ -944,6 +984,14 @@
     const issuer = document.getElementById("Prestador_Inscricao");
     const issuerName = document.getElementById("Prestador_Nome");
     remember(issuer, issuer.value); remember(issuerName, issuerName.value);
+  }
+
+  function missingRecipientAddress() {
+    const address = document.getElementById("pnlDestinatarioEnderecoBrasil");
+    if (!document.getElementById("Destinatario_InformarEndereco")?.checked || !visible(address)) return [];
+    return ["CEP", "Bairro", "Logradouro", "Numero"]
+      .map(key => address.querySelector("#Destinatario_EnderecoNacional_" + key))
+      .filter(field => visible(field) && !field.disabled && !field.readOnly && !field.value.trim());
   }
 
   async function fillPeople(documentNumber, invoice) {
@@ -977,6 +1025,15 @@
     }
     await tryStep(() => applyRadio(() => panel("pnlIntermediario"), "Intermediário", settings.intermediary));
     if (issues.length) throw new Error(issues.join(" · "));
+
+    if (type === "CPF" && !settings.recipientIsAcquirer && settings.recipientLocation === "Brasil") {
+      const missing = missingRecipientAddress();
+      if (missing.length) {
+        guide.point(missing[0]);
+        const fields = missing.map(field => validationFieldLabel(field).split(" · ").at(-1));
+        throw new Error("Destinatário: preencha o endereço no portal (" + fields.join(", ") + ")");
+      }
+    }
 
     const next = document.getElementById("btnAvancar");
     const form = next?.form || next?.closest("form");
@@ -1220,6 +1277,17 @@
     await checkRemoteControl();
     if (stopped) return;
     const inValues = valuesPath.test(location.pathname);
+    if (peoplePath.test(location.pathname)) {
+      const health = portalHealth();
+      if (health?.kind === "validation") {
+        const state = await chrome.runtime.sendMessage({type:"nfse:status"});
+        if (!running && state?.phase === "waiting" && state.until > Date.now() && state.visualDraft === draftId()) {
+          audit = Array.isArray(state.audit) ? state.audit : [];
+          await report(new Error(health.message), state.invoice);
+        }
+      }
+      return;
+    }
     if (!inValues && !servicePath.test(location.pathname) && !peoplePath.test(location.pathname)) {
       const state = await chrome.runtime.sendMessage({type:"nfse:status"});
       if (state?.phase === "review" && state.until > Date.now() && state.visualDraft &&
@@ -1257,6 +1325,10 @@
   }
 
   chrome.runtime.onMessage.addListener((message, _, respond) => {
+    if (message.type === "nfse:ping") {
+      respond({version:chrome.runtime.getManifest().version, running});
+      return;
+    }
     if (message.type === "nfse:stop") {
       if (running && activeRemoteJobId !== message.jobId) { respond({stopped:false}); return; }
       stopped = true;
@@ -1287,8 +1359,16 @@
       return;
     }
     if (message.type !== "nfse:start") return;
-    if (running || !peoplePath.test(location.pathname) || !/^(?:\d{11}|\d{14})$/.test(message.cnpj) || !validInvoice(message.invoice)) {
-      respond({ ok: false });
+    if (running) {
+      respond({ok:false, error:"Esta guia já está preenchendo a nota. Aguarde ou confira o andamento no portal."});
+      return;
+    }
+    if (!peoplePath.test(location.pathname)) {
+      respond({ok:false, error:"Abra a etapa Pessoas para iniciar uma nova nota."});
+      return;
+    }
+    if (!/^(?:\d{11}|\d{14})$/.test(message.cnpj) || !validInvoice(message.invoice)) {
+      respond({ok:false, error:"Confira o CPF ou CNPJ do tomador, a descrição e o valor do serviço no painel."});
       return;
     }
     running = true;

@@ -8,6 +8,9 @@ const amount = document.querySelector("#amount");
 const suspensionChoices = Array.from(document.querySelectorAll("[name=issqn-suspended]"));
 const button = document.querySelector("#fill");
 const status = document.querySelector("#status");
+const reloadPortal = document.querySelector("#reload-portal");
+const extensionVersion = chrome.runtime.getManifest().version;
+let reconnectTabId = null;
 const peopleUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Pessoas(?:[/?#]|$)/i;
 const serviceUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Servi(?:c|ç|%c3%a7)o(?:[/?#]|$)/i;
 const valuesUrl = /^https:\/\/www\.nfse\.gov\.br\/EmissorNacional\/DPS\/Tributacao(?:[/?#]|$)/i;
@@ -252,7 +255,7 @@ async function targetTab() {
   const [active] = await chrome.tabs.query({ active: true, currentWindow: true });
   return active;
 }
-document.querySelector("#version").textContent = "v" + chrome.runtime.getManifest().version;
+document.querySelector("#version").textContent = "v" + extensionVersion;
 async function refreshUpdater() {
   const indicator = document.querySelector("#update-dot");
   const message = document.querySelector("#update-status");
@@ -315,6 +318,31 @@ function show(message, error = false) {
   status.textContent = message;
   status.dataset.error = String(error);
 }
+function offerPortalReload(tabId, message) {
+  reconnectTabId = tabId;
+  reloadPortal.hidden = false;
+  show(message, true);
+}
+function clearPortalReload() {
+  reconnectTabId = null;
+  reloadPortal.hidden = true;
+}
+reloadPortal.addEventListener("click", async () => {
+  const id = reconnectTabId;
+  const target = await targetTab();
+  if (id == null || tab?.id !== id || target?.id !== id || ![peopleUrl, serviceUrl, valuesUrl].some(pattern => pattern.test(target.url || ""))) return;
+  reloadPortal.disabled = true;
+  try {
+    await saveDraft();
+    await chrome.tabs.reload(id);
+    clearPortalReload();
+    show("Aba recarregando. Quando o formulário abrir, clique novamente em Preencher.");
+  } catch {
+    show("Não consegui recarregar a aba. Atualize a página do portal com F5.", true);
+  } finally {
+    reloadPortal.disabled = false;
+  }
+});
 function mask(value) {
   if (documentType.value === "cpf") {
     return value.slice(0, 3) + (value.length > 3 ? "." + value.slice(3, 6) : "") +
@@ -381,13 +409,13 @@ function saveDraft() {
     amount: amount.value,
     suspension: suspensionChoices.find((choice) => choice.checked)?.value || "no"
   };
-  chrome.storage.session.set({ [draftKey]: draft }).catch(() => {
-    if (!busy && !starting) show("Não foi possível guardar o rascunho nesta guia.", true);
-  });
+  return chrome.storage.session.set({ [draftKey]: draft });
 }
 function onDraftEdit() {
   renderButton();
-  saveDraft();
+  saveDraft()?.catch(() => {
+    if (!busy && !starting) show("Não foi possível guardar o rascunho nesta guia.", true);
+  });
   if (!initializing && !busy && !starting && peopleUrl.test(tab?.url || "") && status.dataset.error !== "true") {
     show(hasDocument() && invoiceData()
       ? "Tudo pronto. Vamos preparar sua nota?"
@@ -443,6 +471,7 @@ async function refresh() {
   const nextTab = await targetTab();
   if (sequence !== refreshSequence) return;
   if (tab?.id !== nextTab?.id || initializing) {
+    clearPortalReload();
     initializing = true;
     renderButton();
     const nextKey = nextTab?.id == null ? null : "nfsePopupDraft:" + nextTab.id;
@@ -503,18 +532,42 @@ async function refresh() {
 document.querySelector("#fill-form").addEventListener("submit", async (event) => {
   event.preventDefault();
   if (button.disabled) return;
+  const requestedTab = tab;
+  clearPortalReload();
   starting = true;
   renderButton();
   show("Iniciando preenchimento…");
   try {
+    const target = await targetTab();
+    if (target?.id !== requestedTab.id || target.url !== requestedTab.url) {
+      show("A guia mudou. Abra o painel na etapa que deseja preencher e tente novamente.", true);
+      return;
+    }
+    if (target.status === "loading") {
+      show("O portal ainda está carregando. Aguarde o formulário abrir e tente novamente.");
+      return;
+    }
+    let connection;
+    try {
+      connection = await chrome.tabs.sendMessage(target.id, {type:"nfse:ping"});
+    } catch {
+      // A aba pode ter ficado aberta durante uma atualização da extensão.
+    }
+    if (tab?.id !== target.id || tab.url !== target.url) return;
+    if (connection?.version !== extensionVersion) {
+      offerPortalReload(target.id, "A extensão precisa se reconectar à aba do portal. Os dados digitados no painel ficam guardados nesta guia.");
+      return;
+    }
+    if (connection.running) {
+      show("Esta guia já está preenchendo a nota. Confira o andamento no portal.", true);
+      return;
+    }
     let message = { type: "nfse:start", cnpj: digits(input.value), invoice: invoiceData() };
-    if (serviceUrl.test(tab.url)) message = { type: "nfse:start-service" };
-    if (valuesUrl.test(tab.url)) message = { type: "nfse:start-values" };
-    const reply = await chrome.tabs.sendMessage(tab.id, message);
+    if (serviceUrl.test(target.url)) message = { type: "nfse:start-service" };
+    if (valuesUrl.test(target.url)) message = { type: "nfse:start-values" };
+    const reply = await chrome.tabs.sendMessage(target.id, message);
     if (!reply?.ok) {
-      starting = false;
-      renderButton();
-      show(reply?.error || "Não foi possível iniciar. Atualize a página do portal e tente novamente.", true);
+      show(reply?.error || "O portal recusou o início nesta etapa. Confira os avisos na página.", true);
       return;
     }
     if (message.type === "nfse:start") {
@@ -525,9 +578,10 @@ document.querySelector("#fill-form").addEventListener("submit", async (event) =>
     starting = false;
     await refresh();
   } catch {
+    show("A conexão caiu durante a solicitação. Confira se o preenchimento iniciou na aba do portal antes de tentar novamente.", true);
+  } finally {
     starting = false;
     renderButton();
-    show("Não foi possível iniciar. Atualize a página do portal e tente novamente.", true);
   }
 });
 chrome.storage.onChanged.addListener((changes, area) => {
@@ -566,6 +620,7 @@ chrome.tabs.onUpdated.addListener((id) => { if (id === tab?.id || (expandedView 
 chrome.tabs.onRemoved.addListener((id) => {
   if (id !== tab?.id) return;
   tab = null;
+  clearPortalReload();
   busy = starting = false;
   renderButton();
   show("A guia do portal foi fechada. Abra a extensão pela guia que deseja usar.");
