@@ -1,3 +1,11 @@
+export async function pcPowerStatus(db, device, now) {
+ if (!device.power_ready) {
+  await db.prepare('UPDATE devices SET power_ready=1 WHERE id=? AND power_ready=0').bind(device.id).run();
+ }
+ const command=await db.prepare('SELECT id,state,deadline,expires FROM power_commands WHERE device_id=? ORDER BY created DESC LIMIT 1').bind(device.id).first();
+ return {command,remainingMs:command?.deadline?Math.max(0,command.deadline-now):null};
+}
+
 export async function power(request,db,device,pc,{body,json,ApiError}){
  const path=new URL(request.url).pathname,now=Date.now();
  if(!['/api/power','/api/power/shutdown','/api/power/cancel','/api/pc/power','/api/pc/power/ack','/api/pc/power/commit'].includes(path))return null;
@@ -19,8 +27,8 @@ export async function power(request,db,device,pc,{body,json,ApiError}){
   if(!result)throw new ApiError(409,'Não foi possível cancelar: o comando já terminou ou foi enviado ao Windows.');return json({ok:true});
  }
  if(pc&&path==='/api/pc/power'&&request.method==='POST'){
-  await body(request);await db.prepare('UPDATE devices SET power_ready=1 WHERE id=? AND power_ready=0').bind(device.id).run();
-  const command=await db.prepare('SELECT id,state,deadline,expires FROM power_commands WHERE device_id=? ORDER BY created DESC LIMIT 1').bind(device.id).first();return json({command,remainingMs:command?.deadline?Math.max(0,command.deadline-now):null});
+  await body(request);
+  return json(await pcPowerStatus(db,device,now));
  }
  if(pc&&path==='/api/pc/power/ack'&&request.method==='POST'){
   const input=await body(request);if(!['scheduled','error'].includes(input.state))throw new ApiError(400,'Estado inválido.');

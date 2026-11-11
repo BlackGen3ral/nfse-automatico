@@ -45,6 +45,46 @@ test('Lote de cinco: versão compatível, entrega isolada, reenvio idempotente e
  assert.equal((await call('/api/batches/status?id='+invalid.id,mobile.mobileToken)).data.jobs.length,0);
 });
 
+test('Uma consulta atende cinco canais, cancelamentos e energia sem duplicar notas',async()=>{
+ const env={DB:database()};
+ async function call(path,token,data){
+  const response=await worker.fetch(new Request('https://test.local'+path,{
+   method:data?'POST':'GET',
+   headers:{'content-type':'application/json',...(token?{authorization:'Bearer '+token}:{})},
+   ...(data?{body:JSON.stringify(data)}:{})
+  }),env);
+  return {status:response.status,data:await response.json()};
+ }
+ const pc=(await call('/api/register',null,{name:'PC consulta única'})).data;
+ const mobile=(await call('/api/pair',null,{code:pc.pairCode})).data;
+ const poll=(slots,activeIds=[])=>call('/api/pc/poll',pc.pcToken,{slots,activeIds,ready:false});
+ assert.equal((await poll(6)).status,400);
+ const idle=await poll(5);
+ assert.equal(idle.status,200);
+ assert.deepEqual(idle.data.jobs,[]);
+ assert.equal(idle.data.power.command,null);
+ const batch={id:crypto.randomUUID(),notes:Array.from({length:5},(_,i)=>({id:crypto.randomUUID(),invoice:invoice(i)}))};
+ assert.equal((await call('/api/batches',mobile.mobileToken,batch)).status,201);
+ const results=await Promise.all([poll(5),poll(5)]);
+ assert.deepEqual(results.map(result=>result.data.jobs.length).sort(),[0,5]);
+ const jobs=results.flatMap(result=>result.data.jobs);
+ assert.deepEqual(new Set(jobs.map(job=>job.id)),new Set(batch.notes.map(note=>note.id)));
+ assert.equal((await call('/api/power/shutdown',mobile.mobileToken,{id:crypto.randomUUID()})).status,409);
+ const [first,second]=jobs;
+ for(const job of [first,second])assert.equal((await call('/api/jobs/cancel',mobile.mobileToken,{id:job.id})).status,200);
+ const active=await poll(0,jobs.map(job=>job.id));
+ assert.deepEqual(new Set(active.data.cancelJobIds),new Set([first.id,second.id]));
+ for(const job of jobs)await call('/api/pc/progress',pc.pcToken,{
+  id:job.id,state:active.data.cancelJobIds.includes(job.id)?'cancelled':'review',message:'Teste'
+ });
+ const powerId=crypto.randomUUID();
+ assert.equal((await call('/api/power/shutdown',mobile.mobileToken,{id:powerId})).status,201);
+ const power=await poll(5);
+ assert.equal(power.data.power.command.id,powerId);
+ assert.equal(power.data.power.command.state,'queued');
+ assert.deepEqual(power.data.jobs,[]);
+});
+
 test('Cinco guias mantêm seus canais, dados e revisão separados; guia alheia não recebe lote',async()=>{
  const listeners=[],local={},session={},starts=[],requests=[];
  const storage=store=>({get:async key=>({[key]:store[key]}),set:async values=>Object.assign(store,values),remove:async keys=>{for(const k of Array.isArray(keys)?keys:[keys])delete store[k];}});

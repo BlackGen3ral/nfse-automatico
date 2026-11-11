@@ -20,7 +20,7 @@ using Microsoft.Win32;
 [assembly: AssemblyVersion(Program.CurrentVersion)]
 [assembly: AssemblyFileVersion(Program.CurrentVersion)]
 internal static class Program {
- public const string CurrentVersion="1.7.1";
+ public const string CurrentVersion="1.7.2";
  public const string Site="https://nfse-conecta.pages.dev";
  public static readonly string Folder=Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),"NFSeConecta");
  [STAThread] static void Main(string[] args) {
@@ -155,8 +155,8 @@ internal sealed class ConectaForm:Form {
    }
    if(listener==null)throw new SocketException((int)SocketError.AddressAlreadyInUse);
    RunBackground(() => { AcceptLoop(); return Task.FromResult(0); });
-   SetStatus(Convert.ToBoolean(pairingState["paired"])?"Celular conectado. Você já pode preparar uma nota.":"Conectado. Use Ler QR code do PC no celular para parear.");RunBackground(PollLoop);
-   if(!parallelWorker)await CheckUpdates(false);
+   SetStatus(Convert.ToBoolean(pairingState["paired"])?"Celular conectado. Você já pode preparar uma nota.":"Conectado. Use Ler QR code do PC no celular para parear.");
+   if(!parallelWorker){RunBackground(PollLoop);await CheckUpdates(false);}
   }catch(Exception error){try{File.WriteAllText(Path.Combine(Program.Folder,"connection-error.txt"),Program.CurrentVersion+" "+DateTime.UtcNow.ToString("O")+Environment.NewLine+error);}catch{}if(listener!=null){listener.Stop();listener=null;}SetStatus(error is PcApiException?error.Message:error is SocketException?"Não foi possível abrir a conexão local. Feche outras instâncias do Conecta e tente novamente.":"Falha ao conectar. Confira a internet e clique em Tentar novamente.");SetPairingLabel("Sem conexão","Clique abaixo para tentar conectar novamente.");}
   finally{initializing=false;pair.Enabled=true;if(listener==null)pair.Text="Tentar novamente";}
  }
@@ -227,18 +227,42 @@ internal sealed class ConectaForm:Form {
    SetStatus("Não foi possível abrir o Google Chrome.");
   }
  }
- async Task ClaimJob() {
+ async Task PollCommands() {
   await executionGate.WaitAsync();
   try {
-   if(updating || exit || powerPending) return;
-   bool ready;string current;lock(gate){ready=job==null&&!waitingForStop;current=job==null?null:Str(job,"id");}
-   var data=await Api("/api/pc/poll",new{ready=ready,parallel=true,jobId=current},true);
+   if(updating || exit) return;
+   var available=new List<ConectaForm>();
+   var active=new Dictionary<string,ConectaForm>();
+   foreach(var channel in Channels()) {
+    lock(channel.gate) {
+     if(channel.job!=null)active.Add(Str(channel.job,"id"),channel);
+     else if(!channel.waitingForStop)available.Add(channel);
+    }
+   }
+   var data=await Api("/api/pc/poll",new{ready=false,slots=powerPending?0:available.Count,activeIds=active.Keys.ToArray()},true);
    ApplyPairingState(data);
-   if(!parallelWorker&&data.ContainsKey("paired")&&Convert.ToBoolean(data["paired"])&&!workersStarted){workersStarted=true;BeginInvoke(new Action(async()=>{for(int i=0;i<4;i++){var worker=new ConectaForm(true,true);lock(gate){worker.config=new Dictionary<string,object>(config);}var handle=worker.Handle;lock(workers){workers.Add(worker);}await worker.Initialize();}}));}
-   var cancelId=Str(data,"cancelJobId");
-   if(cancelId!=""&&job!=null&&Str(job,"id")==cancelId)RequestCancellation(cancelId);
-   if(!data.ContainsKey("job") || data["job"]==null) return;
-   var incoming=(Dictionary<string,object>)data["job"];
+   if(Convert.ToBoolean(data["paired"])&&!workersStarted) {
+    workersStarted=true;
+    BeginInvoke(new Action(async()=>{
+     for(int i=0;i<4&&!exit;i++){
+      var worker=new ConectaForm(true,true);
+      lock(gate){worker.config=new Dictionary<string,object>(config);}
+      var handle=worker.Handle;
+      await worker.Initialize();
+      if(worker.listener!=null){lock(workers){workers.Add(worker);}}
+      else worker.Close();
+     }
+    }));
+   }
+   await HandlePower((Dictionary<string,object>)data["power"]);
+   foreach(string id in (System.Collections.IEnumerable)data["cancelJobIds"])
+    if(active.ContainsKey(id))active[id].RequestCancellation(id);
+   int slot=0;
+   foreach(Dictionary<string,object> incoming in (System.Collections.IEnumerable)data["jobs"])
+    await available[slot++].AcceptJob(incoming);
+  } finally { executionGate.Release(); }
+ }
+ async Task AcceptJob(Dictionary<string,object> incoming) {
    var id=Str(incoming,"id");
    bool accept;
    lock(gate) {
@@ -258,16 +282,15 @@ internal sealed class ConectaForm:Form {
    } else {
     await Api("/api/pc/progress",new{id=id,state="error",message="Uma execução anterior foi interrompida. Confira o PC antes de enviar novamente."},true);
    }
-  } finally { executionGate.Release(); }
+ }
+ ConectaForm[] Channels(){
+  lock(workers){return new[]{this}.Concat(workers).ToArray();}
  }
  bool AnyNotesRunning(){
-  lock(gate){if(job!=null||waitingForStop)return true;}
-  ConectaForm[] snapshot;lock(workers){snapshot=workers.ToArray();}
-  foreach(var worker in snapshot){lock(worker.gate){if(worker.job!=null||worker.waitingForStop)return true;}}return false;
+  foreach(var channel in Channels()){lock(channel.gate){if(channel.job!=null||channel.waitingForStop)return true;}}
+  return false;
  }
- async Task PollPower(){
-  if(parallelWorker)return;
-  var result=await Api("/api/pc/power",new{},true);
+ async Task HandlePower(Dictionary<string,object> result){
   var command=result.ContainsKey("command")?result["command"] as Dictionary<string,object>:null;
   if(command==null || !new[]{"queued","scheduled"}.Contains(Str(command,"state"))){powerPending=false;powerId="";return;}
   var id=Str(command,"id");var state=Str(command,"state");
@@ -278,7 +301,9 @@ internal sealed class ConectaForm:Form {
   if(state=="queued"){
    if(powerId!=id){powerId=id;lock(gate){config["lastPower"]=id;Save();}}
    await Api("/api/pc/power/ack",new{id=id,state="scheduled"},true);
-   SetStatus("Desligamento imediato solicitado pelo celular.");await PollPower();return;
+   SetStatus("Desligamento imediato solicitado pelo celular.");
+   await HandlePower(await Api("/api/pc/power",new{},true));
+   return;
   }
   var due=Convert.ToInt64(command["deadline"]);
   long now=(long)(DateTime.UtcNow-new DateTime(1970,1,1,0,0,0,DateTimeKind.Utc)).TotalMilliseconds;
@@ -295,10 +320,18 @@ internal sealed class ConectaForm:Form {
   DateTime nextUpdate=DateTime.UtcNow.AddMinutes(1);
   while(!exit) {
    try {
-    if(!parallelWorker)await PollPower();
-    await ClaimJob();
-    if(!parallelWorker&&DateTime.UtcNow>=nextWakeSync){await PublishWakeConfig();nextWakeSync=DateTime.UtcNow.AddMinutes(5);}
-
+    await PollCommands();
+    if(DateTime.UtcNow>=nextWakeSync){await PublishWakeConfig();nextWakeSync=DateTime.UtcNow.AddMinutes(5);}
+    foreach(var channel in Channels())await channel.PublishProgress();
+    if(DateTime.UtcNow>=nextUpdate) {
+     await CheckUpdates(false);
+     nextUpdate=DateTime.UtcNow.AddMinutes(15);
+    }
+   } catch { SetStatus("Reconectando ao serviço. Os dados da solicitação atual continuam preservados."); }
+   await Task.Delay(powerPending || AnyNotesRunning()?1000:3000);
+  }
+ }
+ async Task PublishProgress() {
     string state,text,idCurrent;
     lock(gate) {
      if(job!=null && !waitingForStop && (DateTime.UtcNow-jobStarted).TotalMinutes>9) {
@@ -313,7 +346,7 @@ internal sealed class ConectaForm:Form {
      var result=await Api("/api/pc/progress",new{id=idCurrent,state=state,message=text},true);
      if(result.ContainsKey("cancelRequested") && Convert.ToBoolean(result["cancelRequested"])) {
       RequestCancellation(idCurrent);
-      continue;
+      return;
      }
      lock(gate) {
       if(pendingState==state && pendingText==text) {
@@ -325,13 +358,6 @@ internal sealed class ConectaForm:Form {
      }
      SetStatus(text);
     }
-    if(DateTime.UtcNow>=nextUpdate) {
-     await CheckUpdates(false);
-     nextUpdate=DateTime.UtcNow.AddMinutes(15);
-    }
-   } catch { SetStatus("Reconectando ao serviço. Os dados da solicitação atual continuam preservados."); }
-   await Task.Delay(powerPending || job!=null || pendingState=="cancelled"?1000:3000);
-  }
  }
  void RequestCancellation(string id) {
   lock(gate) {

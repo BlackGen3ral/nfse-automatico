@@ -1,7 +1,7 @@
 import { assets } from "./assets.js";
 import {diagnostics} from './diagnostics.js';
 import {validateWakeConfig,canWaitForPc} from './wake.js';
-import {power} from './power.js';
+import {power, pcPowerStatus} from './power.js';
 const headers = {
   "content-type": "application/json; charset=utf-8",
   "cache-control": "no-store",
@@ -211,6 +211,33 @@ async function api(request, env) {
   }
   if (pc && path === "/api/pc/poll" && request.method === "POST") {
     const pollInput=await body(request);
+    if (Object.hasOwn(pollInput, "slots")) {
+      const {slots, activeIds} = pollInput;
+      if (!Number.isInteger(slots) || slots < 0 || slots > 5 || !Array.isArray(activeIds) ||
+          activeIds.length + slots > 5 || !activeIds.every(id => typeof id === "string" && /^[a-f0-9-]{36}$/.test(id))) {
+        throw new ApiError(400, "Canais de preenchimento inválidos.");
+      }
+      await db.prepare("UPDATE devices SET last_seen=?, parallel_ready=1 WHERE id=?")
+        .bind(now, device.id).run();
+      const powerStatus = await pcPowerStatus(db, device, now);
+      if (powerStatus.command?.expires <= now) powerStatus.command = null;
+      const stopping = activeIds.length ? await db.prepare(
+        "SELECT id FROM jobs WHERE device_id=? AND cancel_requested=1 AND state IN('claimed','running') AND id IN (SELECT value FROM json_each(?))"
+      ).bind(device.id, JSON.stringify(activeIds)).all() : {results:[]};
+      const claimed = slots && !["queued","scheduled"].includes(powerStatus.command?.state)
+        ? await db.prepare(
+          "UPDATE jobs SET state='claimed',message='Abrindo o portal no PC…' WHERE id IN (SELECT id FROM jobs WHERE device_id=? AND state='queued' AND expires>? ORDER BY created,id LIMIT ?) AND state='queued' RETURNING id,payload,expires,batch_id"
+        ).bind(device.id, now, slots).all() : {results:[]};
+      return json({
+        paired: !!device.mobile_hash,
+        pairCode: device.pair_expires > now ? device.pair_code : null,
+        power: powerStatus,
+        cancelJobIds: stopping.results.map(row => row.id),
+        jobs: claimed.results.map(row => ({
+          id:row.id, invoice:JSON.parse(row.payload), expires:row.expires, batchId:row.batch_id || null,
+        })),
+      });
+    }
     const stopping = await db.prepare("SELECT id FROM jobs WHERE device_id=? AND cancel_requested=1 AND state IN('claimed','running') AND (? IS NULL OR id=?)")
       .bind(device.id,pollInput.jobId||null,pollInput.jobId||null).first();
     await db
