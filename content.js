@@ -8,7 +8,7 @@
   const stageName = () => peoplePath.test(location.pathname) ? "Pessoas" : servicePath.test(location.pathname) ? "Serviço" : "Valores";
   function remember(field, expected) {
     if (!field) return;
-    const names = {SimplesNacional_RegimeApuracaoTributosSN:"Regime de apuração do Simples Nacional",Prestador_Inscricao:"CNPJ do emitente",Prestador_Nome:"Dados do emitente",Tomador_Inscricao:"CNPJ do tomador",Destinatario_Inscricao:"CNPJ do destinatário",DataCompetencia:"Data de competência",LocalPrestacao_CodigoPaisPrestacao:"País da prestação",LocalPrestacao_CodigoMunicipioPrestacao:"Município da prestação",ServicoPrestado_CodigoTributacaoNacional:"Código de Tributação Nacional",ServicoPrestado_CodigoNBS:"Item NBS",ServicoPrestado_CodigoIndOp:"Indicador da operação",ServicoPrestado_Descricao:"Descrição do serviço",Valores_ValorServico:"Valor do serviço",ValorTributos_AliquotaSN:"Alíquota do Simples Nacional",TributacaoFederal_PISCofins_SituacaoTributaria:"Situação do PIS/COFINS",TributacaoFederal_PISCofins_TipoRetencao:"Retenção do PIS/COFINS/CSLL",ValorTributos_CodigoSituacaoTributaria:"Situação tributária IBS/CBS",ValorTributos_CodigoClassificacaoTributaria:"Classificação tributária IBS/CBS"};
+    const names = {SimplesNacional_RegimeApuracaoTributosSN:"Regime de apuração do Simples Nacional",Prestador_Inscricao:"CNPJ do emitente",Prestador_Nome:"Dados do emitente",Tomador_Inscricao:"Documento do tomador",Destinatario_Inscricao:"Documento do destinatário",DataCompetencia:"Data de competência",LocalPrestacao_CodigoPaisPrestacao:"País da prestação",LocalPrestacao_CodigoMunicipioPrestacao:"Município da prestação",ServicoPrestado_CodigoTributacaoNacional:"Código de Tributação Nacional",ServicoPrestado_CodigoNBS:"Item NBS",ServicoPrestado_CodigoIndOp:"Indicador da operação",ServicoPrestado_Descricao:"Descrição do serviço",Valores_ValorServico:"Valor do serviço",ValorTributos_AliquotaSN:"Alíquota do Simples Nacional",TributacaoFederal_PISCofins_SituacaoTributaria:"Situação do PIS/COFINS",TributacaoFederal_PISCofins_TipoRetencao:"Retenção do PIS/COFINS/CSLL",ValorTributos_CodigoSituacaoTributaria:"Situação tributária IBS/CBS",ValorTributos_CodigoClassificacaoTributaria:"Classificação tributária IBS/CBS"};
     const label = names[field.id] || Array.from(field.labels || []).map(item => item.textContent.trim()).find(Boolean) ||
       field.id || field.name || "Campo preenchido";
     const key = field.type === "radio" ? field.name || field.id : field.id || field.name;
@@ -46,7 +46,10 @@
   function compareReviewValue(actual, check) {
     const clean = value => String(value ?? "").replace(/\s+/g," ").trim();
     if (check.id==="ServicoPrestado_Descricao") return clean(actual)===clean(check.expected);
-    if (/Inscricao|CNPJ/.test(check.id + check.label)) return DIGITS(actual).length===14 && DIGITS(actual)===DIGITS(check.expected);
+    if (/Inscricao|CPF|CNPJ/.test(check.id + check.label)) {
+      const expected = DIGITS(check.expected);
+      return /^(?:\d{11}|\d{14})$/.test(expected) && DIGITS(actual) === expected;
+    }
     if (/ValorServico|AliquotaSN/.test(check.id)) {
       const number = value => Number(String(value).replace(/R\$|%|\s/g,"").replace(/\./g,"").replace(",","."));
       return clean(actual)!=="" && Number.isFinite(number(actual)) && number(actual)===number(check.expected);
@@ -60,10 +63,10 @@
   }
   function reviewFieldSpec(check) {
     const specs = {
-      Prestador_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Informações do Emitente"},
+      Prestador_Inscricao:{aliases:["CPF","CNPJ","CPF/CNPJ","CNPJ/CPF"],section:"Informações do Emitente"},
       Prestador_Nome:{aliases:["Nome/Razão Social"],section:"Informações do Emitente"},
-      Tomador_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Tomador/Adquirente do Serviço"},
-      Destinatario_Inscricao:{aliases:["CNPJ","CPF/CNPJ"],section:"Destinatário do Serviço"},
+      Tomador_Inscricao:{aliases:["CPF","CNPJ","CPF/CNPJ","CNPJ/CPF"],section:"Tomador/Adquirente do Serviço"},
+      Destinatario_Inscricao:{aliases:["CPF","CNPJ","CPF/CNPJ","CNPJ/CPF"],section:"Destinatário do Serviço"},
       DataCompetencia:{aliases:["Data de Competência"]},
       ServicoPrestado_Descricao:{aliases:["Descrição do Serviço/Fornecimento"]},
       LocalPrestacao_CodigoMunicipioPrestacao:{aliases:["Local do Fornecimento/Prestação do Serviço"],section:"Serviço Prestado"},
@@ -318,9 +321,9 @@
     return radio.checked;
   }
 
-  function findCnpjInput(panel, stem) {
+  function findDocumentInput(panel, stem) {
     return panel?.querySelector(`#${stem}_Inscricao, input[name="${stem}.Inscricao"], input[id*="${stem}_Inscricao"]`) ||
-      findControl(panel, /^(cpf cnpj|cnpj)$/);
+      findControl(panel, /^(cpf cnpj|cnpj cpf|cpf|cnpj)$/);
   }
 
   const defaults = {
@@ -883,13 +886,16 @@
     return (field?.value || field?.textContent || "").trim();
   }
 
-  async function lookup(scope, stem, label, cnpj) {
-    const field = () => findCnpjInput(scope(), stem);
-    const input = await waitFor(label + " · campo de CNPJ", () => visible(field()) && field());
-    const previousCnpj = DIGITS(input.value);
+  async function lookup(scope, stem, label, documentNumber) {
+    const type = documentNumber.length === 11 ? "CPF" : "CNPJ";
+    const field = () => findDocumentInput(scope(), stem);
+    const input = await waitFor(label + " · campo de " + type, () => visible(field()) && field());
+    const previousDocument = DIGITS(input.value);
     const previousName = lookupName(scope(), stem);
-    const formatted = cnpj.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
-    if (!setNativeValue(input, formatted) || DIGITS(input.value) !== cnpj) throw new Error(label + " · CNPJ");
+    const formatted = type === "CPF"
+      ? documentNumber.replace(/^(\d{3})(\d{3})(\d{3})(\d{2})$/, "$1.$2.$3-$4")
+      : documentNumber.replace(/^(\d{2})(\d{3})(\d{3})(\d{4})(\d{2})$/, "$1.$2.$3/$4-$5");
+    if (!setNativeValue(input, formatted) || DIGITS(input.value) !== documentNumber) throw new Error(label + " · " + type);
     const button = await waitFor(label + " · botão de pesquisa", () => {
       const candidate = scope()?.querySelector("#btn_" + stem + "_Inscricao_pesquisar") ||
         field()?.closest(".input-group")?.querySelector("button[id$='_pesquisar']");
@@ -897,19 +903,19 @@
     });
     let nameWasCleared = !previousName || !lookupName(scope(), stem);
     await recoverStep(label + " · pesquisa", async () => {
-    if (!button.isConnected || button.disabled || DIGITS(field()?.value) !== cnpj) throw portalFailure(label + " · pesquisa indisponível");
+    if (!button.isConnected || button.disabled || DIGITS(field()?.value) !== documentNumber) throw portalFailure(label + " · pesquisa indisponível");
     guide.point(button, true);
     ensureRunning();
     button.click();
     await waitFor(label + " · resultado da pesquisa", () => {
       const name = lookupName(scope(), stem);
       if (!name) nameWasCleared = true;
-      return DIGITS(field()?.value) === cnpj && name &&
-        (previousCnpj === cnpj || nameWasCleared || name !== previousName);
+      return DIGITS(field()?.value) === documentNumber && name &&
+        (previousDocument === documentNumber || nameWasCleared || name !== previousName);
     }, 12000);
     });
     confirmations.set(stem + "_consulta", {label: label + " · dados pesquisados", check: () =>
-      DIGITS(field()?.value) === cnpj && !!lookupName(scope(), stem)});
+      DIGITS(field()?.value) === documentNumber && !!lookupName(scope(), stem)});
   }
 
   async function prepareIssuer() {
@@ -940,7 +946,8 @@
     remember(issuer, issuer.value); remember(issuerName, issuerName.value);
   }
 
-  async function fillPeople(cnpj, invoice) {
+  async function fillPeople(documentNumber, invoice) {
+    const type = documentNumber.length === 11 ? "CPF" : "CNPJ";
     const settings = await preferences();
     const scope = document.querySelector("main, #main-content") || document;
     const issues = [];
@@ -956,16 +963,16 @@
     const customer = () => panel("pnlTomador");
     const customerReady = await tryStep(() => applyRadio(customer, "Localização do tomador", settings.customerLocation));
     if (customerReady && settings.customerLocation === "Brasil") {
-      showStatus("people", "Pesquisando o CNPJ do tomador…");
-      await tryStep(() => lookup(customer, "Tomador", "Tomador", cnpj));
+      showStatus("people", "Pesquisando o " + type + " do tomador…");
+      await tryStep(() => lookup(customer, "Tomador", "Tomador", documentNumber));
     }
     const destination = () => panel("pnlDestinatario");
     const destinationReady = await tryStep(() => applyRadio(destination, "Destinatário é o próprio adquirente", settings.recipientIsAcquirer ? "Sim" : "Não"));
     if (destinationReady && !settings.recipientIsAcquirer) {
       const locationReady = await tryStep(() => applyRadio(destination, "Localização do destinatário", settings.recipientLocation));
       if (locationReady && settings.recipientLocation === "Brasil") {
-        showStatus("people", "Pesquisando o CNPJ do destinatário…");
-        await tryStep(() => lookup(destination, "Destinatario", "Destinatário", cnpj));
+        showStatus("people", "Pesquisando o " + type + " do destinatário…");
+        await tryStep(() => lookup(destination, "Destinatario", "Destinatário", documentNumber));
       }
     }
     await tryStep(() => applyRadio(() => panel("pnlIntermediario"), "Intermediário", settings.intermediary));
@@ -1280,7 +1287,7 @@
       return;
     }
     if (message.type !== "nfse:start") return;
-    if (running || !peoplePath.test(location.pathname) || !/^\d{14}$/.test(message.cnpj) || !validInvoice(message.invoice)) {
+    if (running || !peoplePath.test(location.pathname) || !/^(?:\d{11}|\d{14})$/.test(message.cnpj) || !validInvoice(message.invoice)) {
       respond({ ok: false });
       return;
     }
@@ -1292,7 +1299,7 @@
       if (message.jobId) await checkRemoteControl();
       else await chrome.runtime.sendMessage({type:"nfse:manual-begin"});
       ensureRunning();
-      const state = await update("people", "Preenchendo Pessoas e pesquisando o CNPJ…", { invoice: message.invoice, invoiceDraft: draftId() });
+      const state = await update("people", "Preenchendo Pessoas e pesquisando o documento…", { invoice: message.invoice, invoiceDraft: draftId() });
       if (!state) throw new Error("Início do preenchimento");
       showStatus("people", "Conferindo os dados do emitente…");
       await prepareIssuer();

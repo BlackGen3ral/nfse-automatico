@@ -20,6 +20,21 @@ test('Mudança do portal acorda a espera em 16 ms em vez do intervalo de 140 ms 
 test('Campo sem notificação mantém a checagem de segurança',async()=>{
  const e=engine();const waiting=e.waitForPortalChange(60);[...e.timers.values()][0].fn();await waiting;assert.equal(e.getObserver().disconnected,true);assert.equal(e.timers.size,0);
 });
+test('Revisão confere CPF com máscara na seção certa e aponta CPF divergente',()=>{
+ const e=engine();
+ const field=(section,value)=>({
+   textContent:'CPF:',closest:()=>({previousElementSibling:{textContent:section}}),
+   nextElementSibling:{offsetWidth:1,matches:()=>false,textContent:value}
+ });
+ e.labels.push(field('Tomador/Adquirente do Serviço','123.456.789-09'),field('Destinatário do Serviço','987.654.321-00'));
+ const report=e.inspectReview([{stage:'Pessoas',checks:[
+   {id:'Tomador_Inscricao',label:'Documento do tomador',expected:'12345678909',display:'123.456.789-09'},
+   {id:'Destinatario_Inscricao',label:'Documento do destinatário',expected:'12345678909',display:'123.456.789-09'}
+ ]}]);
+ assert.equal(report.confirmed,1);
+ assert.equal(report.changed,1);
+ assert.equal(report.items[1].actual,'987.654.321-00');
+});
 test('Revisão distingue confirmação, diferença e campo não exibido sem presumir sucesso',()=>{
  const e=engine();e.fields.set('ServicoPrestado_Descricao',{offsetWidth:1,matches:()=>true,value:'Serviço aprovado'});e.fields.set('Valores_ValorServico',{offsetWidth:1,matches:()=>true,value:'R$ 250,00'});
  const checks=[{id:'ServicoPrestado_Descricao',label:'Descrição',expected:'Serviço aprovado',display:'Serviço aprovado'},{id:'Valores_ValorServico',label:'Valor',expected:'100,00',display:'100,00'},{id:'ServicoPrestado_CodigoNBS',label:'NBS',expected:'120012000',display:'120012000'}];

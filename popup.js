@@ -1,4 +1,8 @@
 const input = document.querySelector("#cnpj");
+const documentType = document.getElementById("document-type");
+const documentLabel = () => documentType.value === "cpf" ? "CPF" : "CNPJ";
+const documentLength = () => documentType.value === "cpf" ? 11 : 14;
+const hasDocument = () => digits(input.value).length === documentLength();
 const description = document.querySelector("#description");
 const amount = document.querySelector("#amount");
 const suspensionChoices = Array.from(document.querySelectorAll("[name=issqn-suspended]"));
@@ -47,16 +51,17 @@ let pastePending = false;
 async function pasteCopiedCnpj() {
   if (input.disabled || pastePending) return;
   const currentDraft = draftKey;
+  const currentType = documentType.value;
   pastePending = true;
   renderButton();
   try {
     const text = await navigator.clipboard.readText();
-    if (input.disabled || currentDraft !== draftKey) return;
+    if (input.disabled || currentDraft !== draftKey || currentType !== documentType.value) return;
     const cnpj = text.trim().replace(/[\s./-]/g, "");
-    if (!/^\d{14}$/.test(cnpj)) {
+    if (!/^\d+$/.test(cnpj) || cnpj.length !== documentLength()) {
       closeSavedPicker();
       input.focus({preventScroll:true});
-      show("Copie um CNPJ com 14 números e clique novamente na caixinha do CNPJ.");
+      show("Copie um " + documentLabel() + " com " + documentLength() + " números.");
       return;
     }
     input.value = mask(cnpj);
@@ -64,10 +69,10 @@ async function pasteCopiedCnpj() {
     onDraftEdit();
     description.focus();
   } catch {
-    if (!input.disabled && currentDraft === draftKey) {
+    if (!input.disabled && currentDraft === draftKey && currentType === documentType.value) {
       closeSavedPicker();
       input.focus({preventScroll:true});
-      show("Não consegui acessar o conteúdo copiado. Use Ctrl + V no campo CNPJ.");
+      show("Não consegui acessar o conteúdo copiado. Use Ctrl + V no campo do documento.");
     }
   } finally {
     pastePending = false;
@@ -151,7 +156,7 @@ document.addEventListener("focus", event => {
 window.addEventListener("resize", positionSavedPicker);
 document.querySelector("main").addEventListener("scroll", closeSavedPicker, {passive:true});
 function cleanSavedCnpjs(value) {
-  return [...new Set((Array.isArray(value) ? value : []).filter(cnpj => typeof cnpj === "string" && /^\d{14}$/.test(cnpj)))];
+  return [...new Set((Array.isArray(value) ? value : []).filter(cnpj => typeof cnpj === "string" && /^(?:\d{11}|\d{14})$/.test(cnpj)))];
 }
 function savedMessage(text, error = false) {
   const message = document.getElementById("saved-cnpj-status");
@@ -161,22 +166,24 @@ function savedMessage(text, error = false) {
 }
 function renderSavedCnpjs() {
   const blocked = input.disabled || savedWriting;
-  const saved = savedCnpjs.includes(digits(input.value));
+  const type = documentLabel();
+  const savedForType = savedCnpjs.filter(number => number.length === documentLength());
+  const saved = savedForType.includes(digits(input.value));
   const save = document.getElementById("save-cnpj");
-  save.disabled = blocked || digits(input.value).length !== 14 || saved;
+  save.disabled = blocked || !hasDocument() || saved;
   save.textContent = saved ? "✓ Salvo" : "＋ Salvar";
   savedOpener.disabled = blocked;
   pickerAboveChoice.disabled = input.disabled || positionSaving;
   if (input.disabled) closeSavedPicker();
-  document.getElementById("saved-cnpj-count").textContent = String(savedCnpjs.length);
+  document.getElementById("saved-cnpj-count").textContent = String(savedForType.length);
   const list = document.getElementById("saved-cnpj-list");
   list.replaceChildren();
   const query = savedSearch.value.trim();
   const searchDigits = query.replace(/\D/g, "");
-  const matches = savedCnpjs.filter(cnpj => !query || (searchDigits && cnpj.includes(searchDigits)));
+  const matches = savedForType.filter(cnpj => !query || (searchDigits && cnpj.includes(searchDigits)));
   const empty = document.getElementById("saved-cnpj-empty");
   empty.hidden = !!matches.length;
-  empty.textContent = savedCnpjs.length ? "Nenhum CNPJ encontrado." : "Salve um CNPJ pelo botão ＋ Salvar para encontrá-lo aqui.";
+  empty.textContent = savedForType.length ? "Nenhum " + type + " encontrado." : "Salve um " + type + " pelo botão ＋ Salvar para encontrá-lo aqui.";
   for (const cnpj of matches) {
     const item = document.createElement("li");
     const choose = document.createElement("button");
@@ -184,7 +191,7 @@ function renderSavedCnpjs() {
     choose.className = "choose-cnpj";
     choose.textContent = mask(cnpj);
     choose.disabled = blocked;
-    choose.setAttribute("aria-label", "Usar CNPJ " + mask(cnpj));
+    choose.setAttribute("aria-label", "Usar " + type + " " + mask(cnpj));
     choose.onclick = () => {
       if (input.disabled || savedWriting) return;
       input.value = mask(cnpj);
@@ -197,7 +204,7 @@ function renderSavedCnpjs() {
     remove.className = "remove-cnpj";
     remove.textContent = "×";
     remove.disabled = blocked;
-    remove.setAttribute("aria-label", "Remover CNPJ " + mask(cnpj));
+    remove.setAttribute("aria-label", "Remover " + type + " " + mask(cnpj));
     remove.onclick = () => changeSavedCnpjs(cnpj, true);
     item.append(choose, remove);
     list.append(item);
@@ -205,7 +212,8 @@ function renderSavedCnpjs() {
   positionSavedPicker();
 }
 async function changeSavedCnpjs(cnpj, remove = false) {
-  if (input.disabled || savedWriting || !/^\d{14}$/.test(cnpj)) return;
+  if (input.disabled || savedWriting || !/^(?:\d{11}|\d{14})$/.test(cnpj)) return;
+  const type = documentLabel();
   savedWriting = true;
   renderSavedCnpjs();
   try {
@@ -214,9 +222,9 @@ async function changeSavedCnpjs(cnpj, remove = false) {
     const next = remove ? current.filter(value => value !== cnpj) : [...new Set([...current, cnpj])];
     await chrome.storage.local.set({[savedCnpjsKey]: next});
     savedCnpjs = next;
-    savedMessage(remove ? "CNPJ removido da lista." : "CNPJ salvo neste navegador.");
+    savedMessage(remove ? type + " removido da lista." : type + " salvo neste navegador.");
   } catch {
-    savedMessage("Não foi possível alterar os CNPJs salvos. Tente novamente.", true);
+    savedMessage("Não foi possível alterar os documentos salvos. Tente novamente.", true);
   } finally {
     savedWriting = false;
     renderSavedCnpjs();
@@ -295,12 +303,12 @@ function renderButton() {
   document.querySelector("#people-fields").hidden = withoutCnpj;
   document.querySelector("#fill-label").textContent = inValues ? "Preencher Valores" : inService ? "Preencher Serviço" : "Preencher até a revisão";
   if (busy || starting) document.querySelector("#fill-label").textContent = starting ? "Preparando sua nota…" : "Preenchendo nota…";
-  for (const field of [input, description, amount, ...suspensionChoices]) {
+  for (const field of [documentType, input, description, amount, ...suspensionChoices]) {
     field.disabled = withoutCnpj || initializing || busy || starting;
   }
   document.getElementById("paste-cnpj").disabled = input.disabled || pastePending;
   button.disabled = initializing || busy || starting ||
-    (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || digits(input.value).length !== 14 || !invoiceData()));
+    (!withoutCnpj && (!peopleUrl.test(tab?.url || "") || !hasDocument() || !invoiceData()));
   renderSavedCnpjs();
 }
 function show(message, error = false) {
@@ -308,10 +316,52 @@ function show(message, error = false) {
   status.dataset.error = String(error);
 }
 function mask(value) {
+  if (documentType.value === "cpf") {
+    return value.slice(0, 3) + (value.length > 3 ? "." + value.slice(3, 6) : "") +
+      (value.length > 6 ? "." + value.slice(6, 9) : "") + (value.length > 9 ? "-" + value.slice(9, 11) : "");
+  }
   return value.slice(0, 2) + (value.length > 2 ? "." + value.slice(2, 5) : "") +
     (value.length > 5 ? "." + value.slice(5, 8) : "") +
     (value.length > 8 ? "/" + value.slice(8, 12) : "") + (value.length > 12 ? "-" + value.slice(12) : "");
 }
+function renderDocumentType() {
+  const type = documentLabel();
+  const plural = type + "s";
+  const paste = document.getElementById("paste-cnpj");
+  document.getElementById("cnpj-label").textContent = type + " do tomador";
+  paste.title = "Colar " + type + " e ir para a descrição";
+  paste.setAttribute("aria-label", paste.title);
+  input.placeholder = type === "CPF" ? "000.000.000-00" : "00.000.000/0000-00";
+  input.maxLength = type === "CPF" ? 14 : 18;
+  savedOpener.setAttribute("aria-label", "Pesquisar " + plural + " salvos");
+  savedPicker.setAttribute("aria-label", "Pesquisar " + plural + " salvos");
+  document.getElementById("saved-document-heading").textContent = plural + " salvos";
+  document.getElementById("close-cnpjs").setAttribute("aria-label", "Fechar " + plural + " salvos");
+  document.querySelector("label[for=search-cnpj]").textContent = "Pesquisar " + type;
+  document.getElementById("saved-cnpj-list").setAttribute("aria-label", "Escolher um " + type + " salvo");
+  savedSearch.placeholder = "Digite parte do " + type + "…";
+}
+function restoreDocument(draft) {
+  documentType.value = draft?.documentType === "cpf" ? "cpf" : "cnpj";
+  renderDocumentType();
+  const formatted = mask(digits(draft?.cnpj || "").slice(0, documentLength()));
+  if (input.value !== formatted) input.value = formatted;
+}
+documentType.addEventListener("change", () => {
+  closeSavedPicker();
+  savedMessage("");
+  input.value = "";
+  renderDocumentType();
+  onDraftEdit();
+  input.focus({preventScroll:true});
+});
+input.addEventListener("paste", event => {
+  const pasted = event.clipboardData?.getData("text");
+  if (pasted && pasted.replace(/\D/g, "").length > documentLength()) {
+    event.preventDefault();
+    show("O número copiado é longo demais para " + documentLabel() + ". Confira o tipo de documento.");
+  }
+});
 function showAmountHint() {
   const invalid = !!amount.value.trim() && !serviceAmount();
   amount.setAttribute("aria-invalid", String(invalid));
@@ -326,6 +376,7 @@ function saveDraft() {
   if (!draftKey || initializing) return;
   const draft = {
     cnpj: digits(input.value),
+    documentType: documentType.value,
     description: description.value,
     amount: amount.value,
     suspension: suspensionChoices.find((choice) => choice.checked)?.value || "no"
@@ -338,13 +389,13 @@ function onDraftEdit() {
   renderButton();
   saveDraft();
   if (!initializing && !busy && !starting && peopleUrl.test(tab?.url || "") && status.dataset.error !== "true") {
-    show(digits(input.value).length === 14 && invoiceData()
+    show(hasDocument() && invoiceData()
       ? "Tudo pronto. Vamos preparar sua nota?"
-      : "Informe o CNPJ, a descrição e o valor para começar.");
+      : "Informe o " + documentLabel() + ", a descrição e o valor para começar.");
   }
 }
 input.addEventListener("input", () => {
-  input.value = mask(digits(input.value));
+  input.value = mask(digits(input.value).slice(0, documentLength()));
   onDraftEdit();
 });
 description.addEventListener("input", onDraftEdit);
@@ -365,13 +416,13 @@ for (const field of [input, description, amount]) field.addEventListener("keydow
   event.preventDefault();
   if (event.repeat) return;
   if (field === input) {
-    if (digits(input.value).length === 14) description.focus();
-    else show("Complete os 14 números do CNPJ antes de continuar.");
+    if (hasDocument()) description.focus();
+    else show("Complete os " + documentLength() + " números do " + documentLabel() + " antes de continuar.");
   } else if (!serviceAmount()) {
     showAmountHint();
     show("Informe um valor maior que zero antes de continuar.");
   } else if (!description.value.trim()) description.focus();
-  else if (digits(input.value).length !== 14) input.focus();
+  else if (!hasDocument()) input.focus();
   else if (!button.disabled) document.getElementById("fill-form").requestSubmit(button);
 });
 
@@ -383,7 +434,7 @@ async function initialize() {
     const position = await chrome.storage.local.get(pickerAboveKey);
     pickerAbove = position[pickerAboveKey] === true;
     pickerAboveChoice.checked = pickerAbove;
-  } catch { savedMessage("Não foi possível carregar os CNPJs salvos.", true); }
+  } catch { savedMessage("Não foi possível carregar os documentos salvos.", true); }
   await refresh();
   if (!input.disabled && peopleUrl.test(tab?.url || "")) input.focus({preventScroll:true});
 }
@@ -399,7 +450,7 @@ async function refresh() {
     if (sequence !== refreshSequence) return;
     tab = nextTab;
     draftKey = nextKey;
-    input.value = mask(digits(saved?.cnpj || ""));
+    restoreDocument(saved);
     description.value = saved?.description || "";
     amount.value = saved?.amount || "";
     setSuspension(saved?.suspension === "yes" ? "yes" : "no");
@@ -445,7 +496,7 @@ async function refresh() {
     else if (inService) show("A descrição e o avanço ficam com você.");
     else if (inValues) show("Confira os valores antes de avançar.");
     else if (current?.phase === "review") show(current.text);
-    else show(peopleUrl.test(tab?.url || "") ? "Informe o CNPJ, a descrição e o valor para começar." : "Abra Pessoas, Serviço ou Valores no Emissor Nacional.");
+    else show(peopleUrl.test(tab?.url || "") ? "Informe o " + documentLabel() + ", a descrição e o valor para começar." : "Abra Pessoas, Serviço ou Valores no Emissor Nacional.");
   }
   renderButton();
 }
@@ -492,7 +543,8 @@ chrome.storage.onChanged.addListener((changes, area) => {
   }
   if (area !== "session" || initializing) return;
   if (draftKey && changes[draftKey] && !changes[draftKey].newValue) {
-    for (const field of [input, description, amount]) field.value = "";
+    restoreDocument(null);
+    for (const field of [description, amount]) field.value = "";
     setSuspension("no");
     showAmountHint();
     renderButton();
@@ -500,8 +552,7 @@ chrome.storage.onChanged.addListener((changes, area) => {
     // O painel lateral e a guia expandida editam o mesmo rascunho.
     // Só substitui valores diferentes para preservar o cursor ao digitar.
     const draft = changes[draftKey].newValue;
-    const cnpj = mask(digits(draft.cnpj || ""));
-    if (input.value !== cnpj) input.value = cnpj;
+    restoreDocument(draft);
     if (description.value !== (draft.description || "")) description.value = draft.description || "";
     if (amount.value !== (draft.amount || "")) amount.value = draft.amount || "";
     setSuspension(draft.suspension === "yes" ? "yes" : "no");
